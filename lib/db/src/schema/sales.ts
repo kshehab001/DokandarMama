@@ -1,4 +1,4 @@
-import {
+﻿import {
   integer,
   numeric,
   pgTable,
@@ -9,16 +9,9 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { customersTable } from "./customers";
-import { shopsTable } from "./shops";
 
 export const salesTable = pgTable("sales", {
   id: serial("id").primaryKey(),
-  // Tenant boundary: the shop this row belongs to. Nullable only so existing
-  // pre-multi-tenant rows can be backfilled on first shop creation; the API
-  // layer always writes it and always filters on it.
-  shopId: integer("shop_id").references(() => shopsTable.id, {
-    onDelete: "cascade",
-  }),
   // Clerk user ID of the shopkeeper who made this sale.
   userId: text("user_id").notNull(),
   customerId: integer("customer_id").references(() => customersTable.id, {
@@ -33,14 +26,8 @@ export const salesTable = pgTable("sales", {
     .notNull()
     .default("0"),
   paymentMethod: text("payment_method", {
-    // "digital" was added with the bKash/Nagad/card option in billing. This is
-    // a plain text column, so existing cash/baki/mixed rows are untouched.
-    enum: ["cash", "baki", "mixed", "digital"],
+    enum: ["cash", "baki", "mixed"],
   }).notNull(),
-  digitalAmount: numeric("digital_amount", { precision: 12, scale: 2 })
-    .notNull()
-    .default("0"),
-  digitalProvider: text("digital_provider"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -49,7 +36,6 @@ export const salesTable = pgTable("sales", {
 export const insertSaleSchema = createInsertSchema(salesTable).omit({
   id: true,
   userId: true,
-  shopId: true,
   createdAt: true,
 });
 export type InsertSale = z.infer<typeof insertSaleSchema>;
@@ -64,6 +50,7 @@ export const saleItemsTable = pgTable("sale_items", {
   productName: text("product_name").notNull(),
   quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+  costPrice: numeric("cost_price", { precision: 12, scale: 2 }),
   lineTotal: numeric("line_total", { precision: 12, scale: 2 }).notNull(),
 });
 
@@ -72,3 +59,5 @@ export const insertSaleItemSchema = createInsertSchema(saleItemsTable).omit({
 });
 export type InsertSaleItem = z.infer<typeof insertSaleItemSchema>;
 export type SaleItem = typeof saleItemsTable.$inferSelect;
+
+
