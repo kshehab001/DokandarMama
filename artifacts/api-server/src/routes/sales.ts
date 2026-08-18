@@ -1,4 +1,4 @@
-﻿import { Router, type IRouter } from "express";
+import { Router, type IRouter } from "express";
 import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import {
   customersTable,
@@ -104,24 +104,24 @@ router.post("/sales", async (req, res): Promise<void> => {
   const total = subtotal;
 
   if (paidAmount > total) {
-    res.status(400).json({ error: "à¦ªà¦°à¦¿à¦¶à§‹à¦§à¦¿à¦¤ à¦Ÿà¦¾à¦•à¦¾ à¦¬à¦¿à¦²à§‡à¦° à¦šà§‡à¦¯à¦¼à§‡ à¦¬à§‡à¦¶à¦¿ à¦¹à¦¤à§‡ à¦ªà¦¾à¦°à¦¬à§‡ à¦¨à¦¾" });
+    res.status(400).json({ error: "পরিশোধিত টাকা বিলের চেয়ে বেশি হতে পারবে না" });
     return;
   }
   if (paymentMethod === "cash" && paidAmount !== total) {
     res
       .status(400)
-      .json({ error: "à¦¨à¦—à¦¦ à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿà§‡ à¦¸à¦®à§à¦ªà§‚à¦°à§à¦£ à¦¬à¦¿à¦²à§‡à¦° à¦Ÿà¦¾à¦•à¦¾ à¦ªà¦°à¦¿à¦¶à§‹à¦§ à¦•à¦°à¦¤à§‡ à¦¹à¦¬à§‡" });
+      .json({ error: "নগদ পেমেন্টে সম্পূর্ণ বিলের টাকা পরিশোধ করতে হবে" });
     return;
   }
   if (paymentMethod === "baki" && paidAmount !== 0) {
-    res.status(400).json({ error: "à¦¬à¦¾à¦•à¦¿ à¦ªà§‡à¦®à§‡à¦¨à§à¦Ÿà§‡ à¦•à§‹à¦¨à§‹ à¦Ÿà¦¾à¦•à¦¾ à¦ªà¦°à¦¿à¦¶à§‹à¦§ à¦•à¦°à¦¾ à¦¯à¦¾à¦¬à§‡ à¦¨à¦¾" });
+    res.status(400).json({ error: "বাকি পেমেন্টে কোনো টাকা পরিশোধ করা যাবে না" });
     return;
   }
   const dueAmount = Math.max(0, total - paidAmount);
   if ((dueAmount > 0 || paymentMethod === "baki") && customerId === undefined) {
     res
       .status(400)
-      .json({ error: "à¦¬à¦¾à¦•à¦¿ à¦°à¦¾à¦–à¦¤à§‡ à¦¹à¦²à§‡ à¦à¦•à¦œà¦¨ à¦•à¦¾à¦¸à§à¦Ÿà¦®à¦¾à¦° à¦¬à¦¾à¦›à¦¾à¦‡ à¦•à¦°à¦¤à§‡ à¦¹à¦¬à§‡" });
+      .json({ error: "বাকি রাখতে হলে একজন কাস্টমার বাছাই করতে হবে" });
     return;
   }
 
@@ -149,7 +149,7 @@ router.post("/sales", async (req, res): Promise<void> => {
         if (!product) {
           throw new RouteError(
             400,
-            `à¦ªà§à¦°à§‹à¦¡à¦¾à¦•à§à¦Ÿ #${item.productId} à¦ªà¦¾à¦“à¦¯à¦¼à¦¾ à¦¯à¦¾à¦¯à¦¼à¦¨à¦¿`,
+            `প্রোডাক্ট #${item.productId} পাওয়া যায়নি`,
           );
         }
       }
@@ -160,7 +160,7 @@ router.post("/sales", async (req, res): Promise<void> => {
         if (remainingStock < 0) {
           throw new RouteError(
             400,
-            `${product.name}-à¦à¦° à¦¸à§à¦Ÿà¦• à¦ªà¦°à§à¦¯à¦¾à¦ªà§à¦¤ à¦¨à§‡à¦‡ (à¦†à¦›à§‡ ${toNum(product.stock)})`,
+            `${product.name}-এর স্টক পর্যাপ্ত নেই (আছে ${toNum(product.stock)})`,
           );
         }
       }
@@ -176,7 +176,7 @@ router.post("/sales", async (req, res): Promise<void> => {
             ),
           );
         if (!customer) {
-          throw new RouteError(400, "à¦•à¦¾à¦¸à§à¦Ÿà¦®à¦¾à¦° à¦ªà¦¾à¦“à¦¯à¦¼à¦¾ à¦¯à¦¾à¦¯à¦¼à¦¨à¦¿");
+          throw new RouteError(400, "কাস্টমার পাওয়া যায়নি");
         }
       }
 
@@ -255,7 +255,7 @@ router.post("/sales", async (req, res): Promise<void> => {
           type: "sale",
           amount: String(dueAmount),
           balanceAfter: String(newBalance),
-          note: `à¦¬à¦¿à¦² #${sale.id}`,
+          note: `বিল #${sale.id}`,
         });
       }
 

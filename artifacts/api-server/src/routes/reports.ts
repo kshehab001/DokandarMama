@@ -1,4 +1,4 @@
-﻿import { Router, type IRouter } from "express";
+import { Router, type IRouter } from "express";
 import { and, eq, gte, inArray } from "drizzle-orm";
 import {
   customersTable,
@@ -197,8 +197,8 @@ router.get("/suggestions/restock", async (req, res): Promise<void> => {
       if (!isLow && !sellsFast) return null;
 
       const reason = isLow
-        ? "à¦¸à§à¦Ÿà¦• à¦•à¦® à¦†à¦›à§‡, à¦à¦–à¦¨à¦‡ à¦…à¦°à§à¦¡à¦¾à¦° à¦¦à§‡à¦“à¦¯à¦¼à¦¾ à¦‰à¦šà¦¿à¦¤"
-        : "à¦¬à¦¿à¦•à§à¦°à¦¿ à¦¦à§à¦°à§à¦¤ à¦¹à¦šà§à¦›à§‡, à¦à¦• à¦¸à¦ªà§à¦¤à¦¾à¦¹à§‡à¦° à¦®à¦§à§à¦¯à§‡ à¦¸à§à¦Ÿà¦• à¦¶à§‡à¦· à¦¹à¦¯à¦¼à§‡ à¦¯à§‡à¦¤à§‡ à¦ªà¦¾à¦°à§‡";
+        ? "স্টক কম আছে, এখনই অর্ডার দেওয়া উচিত"
+        : "বিক্রি দ্রুত হচ্ছে, এক সপ্তাহের মধ্যে স্টক শেষ হয়ে যেতে পারে";
 
       return {
         productId: p.id,
