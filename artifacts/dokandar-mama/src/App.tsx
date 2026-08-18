@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -229,14 +229,14 @@ function ClerkProviderWithRoutes() {
       localization={{
         signIn: {
           start: {
-            title: 'à¦¸à§à¦¬à¦¾à¦—à¦¤à¦®',
-            subtitle: 'à¦†à¦ªà¦¨à¦¾à¦° à¦¦à§‹à¦•à¦¾à¦¨à§‡à¦° à¦¹à¦¿à¦¸à¦¾à¦¬à§‡ à¦²à¦— à¦‡à¦¨ à¦•à¦°à§à¦¨',
+            title: 'স্বাগতম',
+            subtitle: 'আপনার দোকানের হিসাবে লগ ইন করুন',
           },
         },
         signUp: {
           start: {
-            title: 'à¦…à§à¦¯à¦¾à¦•à¦¾à¦‰à¦¨à§à¦Ÿ à¦¤à§ˆà¦°à¦¿ à¦•à¦°à§à¦¨',
-            subtitle: 'à¦†à¦œà¦‡ à¦†à¦ªà¦¨à¦¾à¦° à¦¦à§‹à¦•à¦¾à¦¨à§‡à¦° à¦¹à¦¿à¦¸à¦¾à¦¬ à¦¶à§à¦°à§ à¦•à¦°à§à¦¨',
+            title: 'অ্যাকাউন্ট তৈরি করুন',
+            subtitle: 'আজই আপনার দোকানের হিসাব শুরু করুন',
           },
         },
       }}
