@@ -12,5 +12,8 @@ export interface Customer {
   /** @nullable */
   phone?: string | null;
   bakiBalance: number;
+  phoneVerified?: boolean;
+  /** @nullable */
+  verifiedAt?: string | null;
   createdAt: string;
 }

@@ -5,6 +5,444 @@
  * Dokandar Mama shop assistant API
  * OpenAPI spec version: 0.1.0
  */
+export type ShopSubscriptionPlan = typeof ShopSubscriptionPlan[keyof typeof ShopSubscriptionPlan];
+
+
+export const ShopSubscriptionPlan = {
+  basic: 'basic',
+  standard: 'standard',
+  premium: 'premium',
+  organization: 'organization',
+} as const;
+
+export interface Shop {
+  id: number;
+  /** @nullable */
+  organizationId?: number | null;
+  name: string;
+  category: string;
+  /** @nullable */
+  ownerName?: string | null;
+  /** @nullable */
+  area?: string | null;
+  subscriptionPlan: ShopSubscriptionPlan;
+  cashboxAddon?: boolean;
+  createdAt: string;
+}
+
+export type ShopWithRoleRole = typeof ShopWithRoleRole[keyof typeof ShopWithRoleRole];
+
+
+export const ShopWithRoleRole = {
+  admin: 'admin',
+  manager: 'manager',
+  shopkeeper: 'shopkeeper',
+} as const;
+
+export type ShopWithRole = Shop & {
+  role: ShopWithRoleRole;
+};
+
+export interface ShopInput {
+  /** @minLength 1 */
+  name: string;
+  category: string;
+  ownerName?: string;
+  area?: string;
+  organizationName?: string;
+}
+
+export type ShopUpdateSubscriptionPlan = typeof ShopUpdateSubscriptionPlan[keyof typeof ShopUpdateSubscriptionPlan];
+
+
+export const ShopUpdateSubscriptionPlan = {
+  basic: 'basic',
+  standard: 'standard',
+  premium: 'premium',
+  organization: 'organization',
+} as const;
+
+export interface ShopUpdate {
+  /** @minLength 1 */
+  name?: string;
+  category?: string;
+  ownerName?: string;
+  area?: string;
+  subscriptionPlan?: ShopUpdateSubscriptionPlan;
+  cashboxAddon?: boolean;
+}
+
+/**
+ * @nullable
+ */
+export type CurrentShopRole = typeof CurrentShopRole[keyof typeof CurrentShopRole] | null;
+
+
+export const CurrentShopRole = {
+  admin: 'admin',
+  manager: 'manager',
+  shopkeeper: 'shopkeeper',
+} as const;
+
+export interface OrganizationRef {
+  id: number;
+  name: string;
+}
+
+export interface CurrentShop {
+  shop?: Shop | null;
+  /** @nullable */
+  role?: CurrentShopRole;
+  organization?: OrganizationRef | null;
+}
+
+export type ShopMemberRole = typeof ShopMemberRole[keyof typeof ShopMemberRole];
+
+
+export const ShopMemberRole = {
+  admin: 'admin',
+  manager: 'manager',
+  shopkeeper: 'shopkeeper',
+} as const;
+
+export interface ShopMember {
+  id: number;
+  userId: string;
+  /** @nullable */
+  name?: string | null;
+  role: ShopMemberRole;
+  createdAt?: string;
+}
+
+export type ShopMemberInputRole = typeof ShopMemberInputRole[keyof typeof ShopMemberInputRole];
+
+
+export const ShopMemberInputRole = {
+  admin: 'admin',
+  manager: 'manager',
+  shopkeeper: 'shopkeeper',
+} as const;
+
+export interface ShopMemberInput {
+  /** @minLength 1 */
+  userId: string;
+  name?: string;
+  role: ShopMemberInputRole;
+}
+
+export type OrganizationInfoBranchesItem = {
+  id: number;
+  name: string;
+  category: string;
+  /** @nullable */
+  area?: string | null;
+  isCurrent: boolean;
+};
+
+export interface OrganizationInfo {
+  organization?: OrganizationRef | null;
+  branches: OrganizationInfoBranchesItem[];
+}
+
+export type OrganizationSummaryBranchesItem = {
+  shopId: number;
+  name: string;
+  totalSales: number;
+  totalDue: number;
+  transactions: number;
+  staffCount: number;
+};
+
+export interface OrganizationSummary {
+  days: number;
+  grandTotal: number;
+  grandDue: number;
+  branches: OrganizationSummaryBranchesItem[];
+}
+
+export interface MasterProduct {
+  id: number;
+  barcode: string;
+  name: string;
+  /** @nullable */
+  nameBn?: string | null;
+  /** @nullable */
+  brand?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  unit?: string | null;
+  /** @nullable */
+  defaultPrice?: number | null;
+  /** @nullable */
+  imageUrl?: string | null;
+}
+
+export type CashSessionStatus = typeof CashSessionStatus[keyof typeof CashSessionStatus];
+
+
+export const CashSessionStatus = {
+  open: 'open',
+  closed: 'closed',
+} as const;
+
+export interface CashSession {
+  id: number;
+  status: CashSessionStatus;
+  openingBalance: number;
+  /** @nullable */
+  expectedClosing?: number | null;
+  /** @nullable */
+  countedClosing?: number | null;
+  /** @nullable */
+  difference?: number | null;
+  /** @nullable */
+  note?: string | null;
+  openedAt: string;
+  /** @nullable */
+  closedAt?: string | null;
+}
+
+export type CashMovementType = typeof CashMovementType[keyof typeof CashMovementType];
+
+
+export const CashMovementType = {
+  sale: 'sale',
+  expense: 'expense',
+  cash_in: 'cash_in',
+  cash_out: 'cash_out',
+} as const;
+
+export interface CashMovement {
+  id: number;
+  type: CashMovementType;
+  amount: number;
+  /** @nullable */
+  note?: string | null;
+  /** @nullable */
+  saleId?: number | null;
+  createdAt: string;
+}
+
+export interface CashboxTotals {
+  cashSales: number;
+  cashIn: number;
+  expenses: number;
+  cashOut: number;
+  net: number;
+}
+
+export interface CashboxState {
+  session?: CashSession | null;
+  totals?: CashboxTotals | null;
+  /** @nullable */
+  expectedClosing?: number | null;
+  movements: CashMovement[];
+}
+
+export interface CashboxOpenInput {
+  /** @minimum 0 */
+  openingBalance: number;
+  note?: string;
+}
+
+export type CashMovementInputType = typeof CashMovementInputType[keyof typeof CashMovementInputType];
+
+
+export const CashMovementInputType = {
+  expense: 'expense',
+  cash_in: 'cash_in',
+  cash_out: 'cash_out',
+} as const;
+
+export interface CashMovementInput {
+  type: CashMovementInputType;
+  /** @minimum 0 */
+  amount: number;
+  note?: string;
+}
+
+export interface CashboxCloseInput {
+  /** @minimum 0 */
+  countedClosing: number;
+  note?: string;
+}
+
+export interface PurchaseInvoiceInput {
+  /** @minLength 1 */
+  rawText: string;
+  imageUrl?: string;
+  supplierName?: string;
+}
+
+export type PurchaseInvoiceSummaryStatus = typeof PurchaseInvoiceSummaryStatus[keyof typeof PurchaseInvoiceSummaryStatus];
+
+
+export const PurchaseInvoiceSummaryStatus = {
+  uploaded: 'uploaded',
+  parsed: 'parsed',
+  confirmed: 'confirmed',
+  failed: 'failed',
+} as const;
+
+export interface PurchaseInvoiceSummary {
+  id: number;
+  /** @nullable */
+  supplierName?: string | null;
+  status: PurchaseInvoiceSummaryStatus;
+  /** @nullable */
+  invoiceTotal?: number | null;
+  createdAt: string;
+  /** @nullable */
+  confirmedAt?: string | null;
+}
+
+export type PurchaseInvoiceItemStatus = typeof PurchaseInvoiceItemStatus[keyof typeof PurchaseInvoiceItemStatus];
+
+
+export const PurchaseInvoiceItemStatus = {
+  pending: 'pending',
+  matched: 'matched',
+  new: 'new',
+  skipped: 'skipped',
+} as const;
+
+export type PurchaseInvoiceItemSuggestionsItem = {
+  productId: number;
+  name: string;
+  score: number;
+};
+
+export interface PurchaseInvoiceItem {
+  id: number;
+  /** @nullable */
+  rawText?: string | null;
+  name: string;
+  quantity: number;
+  /** @nullable */
+  unitCost?: number | null;
+  /** @nullable */
+  lineTotal?: number | null;
+  /** @nullable */
+  matchedProductId?: number | null;
+  status: PurchaseInvoiceItemStatus;
+  suggestions?: PurchaseInvoiceItemSuggestionsItem[];
+}
+
+export type PurchaseInvoice = PurchaseInvoiceSummary & {
+  items: PurchaseInvoiceItem[];
+};
+
+export type PurchaseConfirmInputItemsItem = {
+  /** @minLength 1 */
+  name: string;
+  quantity: number;
+  /** @nullable */
+  unitCost?: number | null;
+  /** @nullable */
+  productId?: number | null;
+  createNew?: boolean;
+  skip?: boolean;
+  sellPrice?: number;
+  unit?: string;
+  category?: string;
+};
+
+export interface PurchaseConfirmInput {
+  supplierName?: string;
+  /** @minItems 1 */
+  items: PurchaseConfirmInputItemsItem[];
+}
+
+export interface PurchaseConfirmResult {
+  id: number;
+  status: string;
+  updatedProducts: number;
+  createdProducts: number;
+}
+
+export type SubscriptionPlanInfoId = typeof SubscriptionPlanInfoId[keyof typeof SubscriptionPlanInfoId];
+
+
+export const SubscriptionPlanInfoId = {
+  basic: 'basic',
+  standard: 'standard',
+  premium: 'premium',
+  organization: 'organization',
+} as const;
+
+export interface SubscriptionPlanInfo {
+  id: SubscriptionPlanInfoId;
+  name: string;
+  /** @nullable */
+  price?: number | null;
+  features: string[];
+}
+
+export type SubscriptionStateCurrentPlan = typeof SubscriptionStateCurrentPlan[keyof typeof SubscriptionStateCurrentPlan];
+
+
+export const SubscriptionStateCurrentPlan = {
+  basic: 'basic',
+  standard: 'standard',
+  premium: 'premium',
+  organization: 'organization',
+} as const;
+
+export type SubscriptionStateHistoryItem = {
+  id: number;
+  plan: string;
+  status: string;
+  startedAt: string;
+  /** @nullable */
+  expiresAt?: string | null;
+};
+
+export interface SubscriptionState {
+  plans: SubscriptionPlanInfo[];
+  currentPlan: SubscriptionStateCurrentPlan;
+  /** @nullable */
+  role?: string | null;
+  history?: SubscriptionStateHistoryItem[];
+}
+
+export type SubscriptionSelectInputPlan = typeof SubscriptionSelectInputPlan[keyof typeof SubscriptionSelectInputPlan];
+
+
+export const SubscriptionSelectInputPlan = {
+  basic: 'basic',
+  standard: 'standard',
+  premium: 'premium',
+  organization: 'organization',
+} as const;
+
+export interface SubscriptionSelectInput {
+  plan: SubscriptionSelectInputPlan;
+}
+
+export interface SubscriptionSelection {
+  id: number;
+  plan: string;
+  status: string;
+  startedAt: string;
+  paymentRequired: boolean;
+}
+
+export interface VerificationSendResult {
+  sent: boolean;
+  customerId: number;
+  message?: string;
+  devCode?: string;
+}
+
+export interface VerificationConfirmInput {
+  /**
+     * @minLength 4
+     * @maxLength 8
+     */
+  code: string;
+}
+
 export interface HealthStatus {
   status: string;
 }
@@ -69,6 +507,9 @@ export interface Customer {
   /** @nullable */
   phone?: string | null;
   bakiBalance: number;
+  phoneVerified?: boolean;
+  /** @nullable */
+  verifiedAt?: string | null;
   createdAt: string;
 }
 
@@ -132,6 +573,7 @@ export const SaleInputPaymentMethod = {
   cash: 'cash',
   baki: 'baki',
   mixed: 'mixed',
+  digital: 'digital',
 } as const;
 
 export interface SaleInput {
@@ -143,6 +585,8 @@ export interface SaleInput {
   /** @minimum 0 */
   paidAmount: number;
   paymentMethod: SaleInputPaymentMethod;
+  digitalAmount?: number;
+  digitalProvider?: string | null;
 }
 
 export type SalePaymentMethod = typeof SalePaymentMethod[keyof typeof SalePaymentMethod];
@@ -152,6 +596,7 @@ export const SalePaymentMethod = {
   cash: 'cash',
   baki: 'baki',
   mixed: 'mixed',
+  digital: 'digital',
 } as const;
 
 export interface Sale {
@@ -168,6 +613,8 @@ export interface Sale {
   paidAmount: number;
   dueAmount: number;
   paymentMethod: SalePaymentMethod;
+  digitalAmount?: number;
+  digitalProvider?: string | null;
   createdAt: string;
 }
 
@@ -245,4 +692,20 @@ export const GetTopProductsRange = {
   week: 'week',
   month: 'month',
 } as const;
+
+export type GetOrganizationSummaryParams = {
+days?: number;
+};
+
+export type SearchMasterProductsParams = {
+search?: string;
+};
+
+export type LookupMasterProductParams = {
+barcode: string;
+};
+
+export type ListCashSessionsParams = {
+from?: string;
+};
 

@@ -194,6 +194,8 @@ export const ListCustomersResponseItem = zod.object({
   "name": zod.string(),
   "phone": zod.string().nullish(),
   "bakiBalance": zod.number(),
+  "phoneVerified": zod.boolean().optional(),
+  "verifiedAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListCustomersResponse = zod.array(ListCustomersResponseItem)
@@ -215,6 +217,8 @@ export const CreateCustomerResponse = zod.object({
   "name": zod.string(),
   "phone": zod.string().nullish(),
   "bakiBalance": zod.number(),
+  "phoneVerified": zod.boolean().optional(),
+  "verifiedAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -231,6 +235,8 @@ export const GetCustomerResponse = zod.object({
   "name": zod.string(),
   "phone": zod.string().nullish(),
   "bakiBalance": zod.number(),
+  "phoneVerified": zod.boolean().optional(),
+  "verifiedAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -255,6 +261,8 @@ export const UpdateCustomerResponse = zod.object({
   "name": zod.string(),
   "phone": zod.string().nullish(),
   "bakiBalance": zod.number(),
+  "phoneVerified": zod.boolean().optional(),
+  "verifiedAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -309,6 +317,8 @@ export const RecordCustomerPaymentResponse = zod.object({
   "name": zod.string(),
   "phone": zod.string().nullish(),
   "bakiBalance": zod.number(),
+  "phoneVerified": zod.boolean().optional(),
+  "verifiedAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -338,7 +348,9 @@ export const ListSalesResponseItem = zod.object({
   "total": zod.number(),
   "paidAmount": zod.number(),
   "dueAmount": zod.number(),
-  "paymentMethod": zod.enum(['cash', 'baki', 'mixed']),
+  "paymentMethod": zod.enum(['cash', 'baki', 'mixed', 'digital']),
+  "digitalAmount": zod.number().optional(),
+  "digitalProvider": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListSalesResponse = zod.array(ListSalesResponseItem)
@@ -366,7 +378,9 @@ export const CreateSaleBody = zod.object({
   "unitPrice": zod.number().min(createSaleBodyItemsItemUnitPriceMin)
 })).min(1),
   "paidAmount": zod.number().min(createSaleBodyPaidAmountMin),
-  "paymentMethod": zod.enum(['cash', 'baki', 'mixed'])
+  "paymentMethod": zod.enum(['cash', 'baki', 'mixed', 'digital']),
+  "digitalAmount": zod.number().optional(),
+  "digitalProvider": zod.string().nullish()
 })
 
 export const CreateSaleResponse = zod.object({
@@ -385,7 +399,9 @@ export const CreateSaleResponse = zod.object({
   "total": zod.number(),
   "paidAmount": zod.number(),
   "dueAmount": zod.number(),
-  "paymentMethod": zod.enum(['cash', 'baki', 'mixed']),
+  "paymentMethod": zod.enum(['cash', 'baki', 'mixed', 'digital']),
+  "digitalAmount": zod.number().optional(),
+  "digitalProvider": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -413,7 +429,9 @@ export const GetSaleResponse = zod.object({
   "total": zod.number(),
   "paidAmount": zod.number(),
   "dueAmount": zod.number(),
-  "paymentMethod": zod.enum(['cash', 'baki', 'mixed']),
+  "paymentMethod": zod.enum(['cash', 'baki', 'mixed', 'digital']),
+  "digitalAmount": zod.number().optional(),
+  "digitalProvider": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -475,5 +493,581 @@ export const GetRestockSuggestionsResponseItem = zod.object({
   "reason": zod.string()
 })
 export const GetRestockSuggestionsResponse = zod.array(GetRestockSuggestionsResponseItem)
+
+
+/**
+ * @summary Shops the signed-in user belongs to
+ */
+export const ListShopsResponseItem = zod.object({
+  "id": zod.number(),
+  "organizationId": zod.number().nullish(),
+  "name": zod.string(),
+  "category": zod.string(),
+  "ownerName": zod.string().nullish(),
+  "area": zod.string().nullish(),
+  "subscriptionPlan": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "cashboxAddon": zod.boolean().optional(),
+  "createdAt": zod.string()
+}).and(zod.object({
+  "role": zod.enum(['admin', 'manager', 'shopkeeper'])
+}))
+export const ListShopsResponse = zod.array(ListShopsResponseItem)
+
+
+/**
+ * @summary Create the user's shop (onboarding)
+ */
+
+
+
+export const CreateShopBody = zod.object({
+  "name": zod.string().min(1),
+  "category": zod.string(),
+  "ownerName": zod.string().optional(),
+  "area": zod.string().optional(),
+  "organizationName": zod.string().optional()
+})
+
+export const CreateShopResponse = zod.object({
+  "id": zod.number(),
+  "organizationId": zod.number().nullish(),
+  "name": zod.string(),
+  "category": zod.string(),
+  "ownerName": zod.string().nullish(),
+  "area": zod.string().nullish(),
+  "subscriptionPlan": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "cashboxAddon": zod.boolean().optional(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Active shop, role and organization
+ */
+export const GetCurrentShopResponse = zod.object({
+  "shop": zod.union([zod.object({
+  "id": zod.number(),
+  "organizationId": zod.number().nullish(),
+  "name": zod.string(),
+  "category": zod.string(),
+  "ownerName": zod.string().nullish(),
+  "area": zod.string().nullish(),
+  "subscriptionPlan": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "cashboxAddon": zod.boolean().optional(),
+  "createdAt": zod.string()
+}),zod.null()]).optional(),
+  "role": zod.union([zod.literal('admin'),zod.literal('manager'),zod.literal('shopkeeper'),zod.literal(null)]).nullish(),
+  "organization": zod.union([zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+}),zod.null()]).optional()
+})
+
+
+/**
+ * @summary Update shop settings (admin)
+ */
+
+
+
+export const UpdateCurrentShopBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "category": zod.string().optional(),
+  "ownerName": zod.string().optional(),
+  "area": zod.string().optional(),
+  "subscriptionPlan": zod.enum(['basic', 'standard', 'premium', 'organization']).optional(),
+  "cashboxAddon": zod.boolean().optional()
+})
+
+export const UpdateCurrentShopResponse = zod.object({
+  "id": zod.number(),
+  "organizationId": zod.number().nullish(),
+  "name": zod.string(),
+  "category": zod.string(),
+  "ownerName": zod.string().nullish(),
+  "area": zod.string().nullish(),
+  "subscriptionPlan": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "cashboxAddon": zod.boolean().optional(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Add a branch to the organization (admin)
+ */
+
+
+
+export const CreateBranchBody = zod.object({
+  "name": zod.string().min(1),
+  "category": zod.string(),
+  "ownerName": zod.string().optional(),
+  "area": zod.string().optional(),
+  "organizationName": zod.string().optional()
+})
+
+export const CreateBranchResponse = zod.object({
+  "id": zod.number(),
+  "organizationId": zod.number().nullish(),
+  "name": zod.string(),
+  "category": zod.string(),
+  "ownerName": zod.string().nullish(),
+  "area": zod.string().nullish(),
+  "subscriptionPlan": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "cashboxAddon": zod.boolean().optional(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Team members of the active shop
+ */
+export const ListShopMembersResponseItem = zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "name": zod.string().nullish(),
+  "role": zod.enum(['admin', 'manager', 'shopkeeper']),
+  "createdAt": zod.string().optional()
+})
+export const ListShopMembersResponse = zod.array(ListShopMembersResponseItem)
+
+
+/**
+ * @summary Add or update a team member (admin)
+ */
+
+
+
+export const AddShopMemberBody = zod.object({
+  "userId": zod.string().min(1),
+  "name": zod.string().optional(),
+  "role": zod.enum(['admin', 'manager', 'shopkeeper'])
+})
+
+export const AddShopMemberResponse = zod.object({
+  "id": zod.number(),
+  "userId": zod.string(),
+  "name": zod.string().nullish(),
+  "role": zod.enum(['admin', 'manager', 'shopkeeper']),
+  "createdAt": zod.string().optional()
+})
+
+
+/**
+ * @summary Remove a team member (admin)
+ */
+export const RemoveShopMemberParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const RemoveShopMemberResponse = zod.void()
+
+
+/**
+ * @summary Organization and its branches
+ */
+export const GetOrganizationResponse = zod.object({
+  "organization": zod.union([zod.object({
+  "id": zod.number(),
+  "name": zod.string()
+}),zod.null()]).optional(),
+  "branches": zod.array(zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "category": zod.string(),
+  "area": zod.string().nullish(),
+  "isCurrent": zod.boolean()
+}))
+})
+
+
+/**
+ * @summary Sales summary per branch
+ */
+export const GetOrganizationSummaryQueryParams = zod.object({
+  "days": zod.coerce.number().optional()
+})
+
+export const GetOrganizationSummaryResponse = zod.object({
+  "days": zod.number(),
+  "grandTotal": zod.number(),
+  "grandDue": zod.number(),
+  "branches": zod.array(zod.object({
+  "shopId": zod.number(),
+  "name": zod.string(),
+  "totalSales": zod.number(),
+  "totalDue": zod.number(),
+  "transactions": zod.number(),
+  "staffCount": zod.number()
+}))
+})
+
+
+/**
+ * @summary Search the global product catalogue
+ */
+export const SearchMasterProductsQueryParams = zod.object({
+  "search": zod.coerce.string().optional()
+})
+
+export const SearchMasterProductsResponseItem = zod.object({
+  "id": zod.number(),
+  "barcode": zod.string(),
+  "name": zod.string(),
+  "nameBn": zod.string().nullish(),
+  "brand": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "unit": zod.string().nullish(),
+  "defaultPrice": zod.number().nullish(),
+  "imageUrl": zod.string().nullish()
+})
+export const SearchMasterProductsResponse = zod.array(SearchMasterProductsResponseItem)
+
+
+/**
+ * @summary Barcode lookup in the global catalogue
+ */
+export const LookupMasterProductQueryParams = zod.object({
+  "barcode": zod.coerce.string()
+})
+
+export const LookupMasterProductResponse = zod.object({
+  "id": zod.number(),
+  "barcode": zod.string(),
+  "name": zod.string(),
+  "nameBn": zod.string().nullish(),
+  "brand": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "unit": zod.string().nullish(),
+  "defaultPrice": zod.number().nullish(),
+  "imageUrl": zod.string().nullish()
+})
+
+
+/**
+ * @summary Current cash drawer state
+ */
+export const GetCashboxStateResponse = zod.object({
+  "session": zod.union([zod.object({
+  "id": zod.number(),
+  "status": zod.enum(['open', 'closed']),
+  "openingBalance": zod.number(),
+  "expectedClosing": zod.number().nullish(),
+  "countedClosing": zod.number().nullish(),
+  "difference": zod.number().nullish(),
+  "note": zod.string().nullish(),
+  "openedAt": zod.string(),
+  "closedAt": zod.string().nullish()
+}),zod.null()]).optional(),
+  "totals": zod.union([zod.object({
+  "cashSales": zod.number(),
+  "cashIn": zod.number(),
+  "expenses": zod.number(),
+  "cashOut": zod.number(),
+  "net": zod.number()
+}),zod.null()]).optional(),
+  "expectedClosing": zod.number().nullish(),
+  "movements": zod.array(zod.object({
+  "id": zod.number(),
+  "type": zod.enum(['sale', 'expense', 'cash_in', 'cash_out']),
+  "amount": zod.number(),
+  "note": zod.string().nullish(),
+  "saleId": zod.number().nullish(),
+  "createdAt": zod.string()
+}))
+})
+
+
+/**
+ * @summary Open the drawer with an opening balance
+ */
+export const openCashboxBodyOpeningBalanceMin = 0;
+
+
+
+export const OpenCashboxBody = zod.object({
+  "openingBalance": zod.number().min(openCashboxBodyOpeningBalanceMin),
+  "note": zod.string().optional()
+})
+
+export const OpenCashboxResponse = zod.object({
+  "id": zod.number(),
+  "status": zod.enum(['open', 'closed']),
+  "openingBalance": zod.number(),
+  "expectedClosing": zod.number().nullish(),
+  "countedClosing": zod.number().nullish(),
+  "difference": zod.number().nullish(),
+  "note": zod.string().nullish(),
+  "openedAt": zod.string(),
+  "closedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Record an expense or manual cash movement
+ */
+export const addCashMovementBodyAmountMin = 0;
+
+
+
+export const AddCashMovementBody = zod.object({
+  "type": zod.enum(['expense', 'cash_in', 'cash_out']),
+  "amount": zod.number().min(addCashMovementBodyAmountMin),
+  "note": zod.string().optional()
+})
+
+export const AddCashMovementResponse = zod.object({
+  "id": zod.number(),
+  "type": zod.enum(['sale', 'expense', 'cash_in', 'cash_out']),
+  "amount": zod.number(),
+  "note": zod.string().nullish(),
+  "saleId": zod.number().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Close the drawer with counted cash
+ */
+export const closeCashboxBodyCountedClosingMin = 0;
+
+
+
+export const CloseCashboxBody = zod.object({
+  "countedClosing": zod.number().min(closeCashboxBodyCountedClosingMin),
+  "note": zod.string().optional()
+})
+
+export const CloseCashboxResponse = zod.object({
+  "id": zod.number(),
+  "status": zod.enum(['open', 'closed']),
+  "openingBalance": zod.number(),
+  "expectedClosing": zod.number().nullish(),
+  "countedClosing": zod.number().nullish(),
+  "difference": zod.number().nullish(),
+  "note": zod.string().nullish(),
+  "openedAt": zod.string(),
+  "closedAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Cash session history
+ */
+export const ListCashSessionsQueryParams = zod.object({
+  "from": zod.coerce.string().optional()
+})
+
+export const ListCashSessionsResponseItem = zod.object({
+  "id": zod.number(),
+  "status": zod.enum(['open', 'closed']),
+  "openingBalance": zod.number(),
+  "expectedClosing": zod.number().nullish(),
+  "countedClosing": zod.number().nullish(),
+  "difference": zod.number().nullish(),
+  "note": zod.string().nullish(),
+  "openedAt": zod.string(),
+  "closedAt": zod.string().nullish()
+})
+export const ListCashSessionsResponse = zod.array(ListCashSessionsResponseItem)
+
+
+/**
+ * @summary Purchase invoice history
+ */
+export const ListPurchaseInvoicesResponseItem = zod.object({
+  "id": zod.number(),
+  "supplierName": zod.string().nullish(),
+  "status": zod.enum(['uploaded', 'parsed', 'confirmed', 'failed']),
+  "invoiceTotal": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "confirmedAt": zod.string().nullish()
+})
+export const ListPurchaseInvoicesResponse = zod.array(ListPurchaseInvoicesResponseItem)
+
+
+/**
+ * @summary Submit invoice OCR text for parsing and matching
+ */
+
+
+
+export const CreatePurchaseInvoiceBody = zod.object({
+  "rawText": zod.string().min(1),
+  "imageUrl": zod.string().optional(),
+  "supplierName": zod.string().optional()
+})
+
+export const CreatePurchaseInvoiceResponse = zod.object({
+  "id": zod.number(),
+  "supplierName": zod.string().nullish(),
+  "status": zod.enum(['uploaded', 'parsed', 'confirmed', 'failed']),
+  "invoiceTotal": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "confirmedAt": zod.string().nullish()
+}).and(zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "rawText": zod.string().nullish(),
+  "name": zod.string(),
+  "quantity": zod.number(),
+  "unitCost": zod.number().nullish(),
+  "lineTotal": zod.number().nullish(),
+  "matchedProductId": zod.number().nullish(),
+  "status": zod.enum(['pending', 'matched', 'new', 'skipped']),
+  "suggestions": zod.array(zod.object({
+  "productId": zod.number(),
+  "name": zod.string(),
+  "score": zod.number()
+})).optional()
+}))
+}))
+
+
+/**
+ * @summary Get a parsed invoice
+ */
+export const GetPurchaseInvoiceParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetPurchaseInvoiceResponse = zod.object({
+  "id": zod.number(),
+  "supplierName": zod.string().nullish(),
+  "status": zod.enum(['uploaded', 'parsed', 'confirmed', 'failed']),
+  "invoiceTotal": zod.number().nullish(),
+  "createdAt": zod.string(),
+  "confirmedAt": zod.string().nullish()
+}).and(zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.number(),
+  "rawText": zod.string().nullish(),
+  "name": zod.string(),
+  "quantity": zod.number(),
+  "unitCost": zod.number().nullish(),
+  "lineTotal": zod.number().nullish(),
+  "matchedProductId": zod.number().nullish(),
+  "status": zod.enum(['pending', 'matched', 'new', 'skipped']),
+  "suggestions": zod.array(zod.object({
+  "productId": zod.number(),
+  "name": zod.string(),
+  "score": zod.number()
+})).optional()
+}))
+}))
+
+
+/**
+ * @summary Confirm invoice lines and update inventory
+ */
+export const ConfirmPurchaseInvoiceParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+
+export const ConfirmPurchaseInvoiceBody = zod.object({
+  "supplierName": zod.string().optional(),
+  "items": zod.array(zod.object({
+  "name": zod.string().min(1),
+  "quantity": zod.number(),
+  "unitCost": zod.number().nullish(),
+  "productId": zod.number().nullish(),
+  "createNew": zod.boolean().optional(),
+  "skip": zod.boolean().optional(),
+  "sellPrice": zod.number().optional(),
+  "unit": zod.string().optional(),
+  "category": zod.string().optional()
+})).min(1)
+})
+
+export const ConfirmPurchaseInvoiceResponse = zod.object({
+  "id": zod.number(),
+  "status": zod.string(),
+  "updatedProducts": zod.number(),
+  "createdProducts": zod.number()
+})
+
+
+/**
+ * @summary Plan catalogue and current plan
+ */
+export const GetSubscriptionResponse = zod.object({
+  "plans": zod.array(zod.object({
+  "id": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "name": zod.string(),
+  "price": zod.number().nullish(),
+  "features": zod.array(zod.string())
+})),
+  "currentPlan": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "role": zod.string().nullish(),
+  "history": zod.array(zod.object({
+  "id": zod.number(),
+  "plan": zod.string(),
+  "status": zod.string(),
+  "startedAt": zod.string(),
+  "expiresAt": zod.string().nullish()
+})).optional()
+})
+
+
+/**
+ * @summary Record a plan selection (no payment yet)
+ */
+export const SelectSubscriptionPlanBody = zod.object({
+  "plan": zod.enum(['basic', 'standard', 'premium', 'organization'])
+})
+
+export const SelectSubscriptionPlanResponse = zod.object({
+  "id": zod.number(),
+  "plan": zod.string(),
+  "status": zod.string(),
+  "startedAt": zod.string(),
+  "paymentRequired": zod.boolean()
+})
+
+
+/**
+ * @summary Send a verification code to the customer's phone
+ */
+export const SendCustomerVerificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const SendCustomerVerificationResponse = zod.object({
+  "sent": zod.boolean(),
+  "customerId": zod.number(),
+  "message": zod.string().optional(),
+  "devCode": zod.string().optional()
+})
+
+
+/**
+ * @summary Confirm the verification code
+ */
+export const ConfirmCustomerVerificationParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const confirmCustomerVerificationBodyCodeMin = 4;
+export const confirmCustomerVerificationBodyCodeMax = 8;
+
+
+
+export const ConfirmCustomerVerificationBody = zod.object({
+  "code": zod.string().min(confirmCustomerVerificationBodyCodeMin).max(confirmCustomerVerificationBodyCodeMax)
+})
+
+export const ConfirmCustomerVerificationResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "phone": zod.string().nullish(),
+  "bakiBalance": zod.number(),
+  "phoneVerified": zod.boolean().optional(),
+  "verifiedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
 
 

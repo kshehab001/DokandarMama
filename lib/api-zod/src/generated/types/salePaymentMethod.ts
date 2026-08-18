@@ -13,4 +13,5 @@ export const SalePaymentMethod = {
   cash: 'cash',
   baki: 'baki',
   mixed: 'mixed',
+  digital: 'digital',
 } as const;

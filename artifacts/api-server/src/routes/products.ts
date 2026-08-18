@@ -11,7 +11,7 @@ import {
   UpdateProductParams,
 } from "@workspace/api-zod";
 import { toNum } from "../lib/numeric";
-import { getUserId } from "../lib/auth";
+import { requireRole, requireShop } from "../lib/tenant";
 
 const router: IRouter = Router();
 
@@ -38,9 +38,9 @@ router.get("/products", async (req, res): Promise<void> => {
     return;
   }
   const { search, lowStockOnly } = parsed.data;
-  const userId = getUserId(req);
+  const { shopId } = requireShop(req);
 
-  const conditions = [eq(productsTable.userId, userId)];
+  const conditions = [eq(productsTable.shopId, shopId)];
   if (search) {
     conditions.push(ilike(productsTable.name, `%${search}%`));
   }
@@ -64,39 +64,31 @@ router.post("/products", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const shopCtx = requireRole(req, "shopkeeper");
   const { name, barcode, category, unit, price, costPrice, stock } =
     parsed.data;
 
-  try {
-    const [row] = await db
-      .insert(productsTable)
-      .values({
-        userId: getUserId(req),
-        name,
-        barcode: barcode ?? null,
-        category,
-        unit,
-        price: String(price),
-        costPrice: costPrice === undefined ? null : String(costPrice),
-        stock: String(stock ?? 0),
-        lowStockThreshold:
-          parsed.data.lowStockThreshold === undefined
-            ? undefined
-            : String(parsed.data.lowStockThreshold),
-        isPriceVariable: parsed.data.isPriceVariable ?? false,
-      })
-      .returning();
+  const [row] = await db
+    .insert(productsTable)
+    .values({
+      userId: shopCtx.userId,
+      shopId: shopCtx.shopId,
+      name,
+      barcode: barcode ?? null,
+      category,
+      unit,
+      price: String(price),
+      costPrice: costPrice === undefined ? null : String(costPrice),
+      stock: String(stock ?? 0),
+      lowStockThreshold:
+        parsed.data.lowStockThreshold === undefined
+          ? undefined
+          : String(parsed.data.lowStockThreshold),
+      isPriceVariable: parsed.data.isPriceVariable ?? false,
+    })
+    .returning();
 
-    res.status(201).json(serializeProduct(row));
-  } catch (err) {
-    if (err && typeof err === "object" && "code" in err && err.code === "23505") {
-      res.status(409).json({
-        error: "এই বারকোডটি ইতিমধ্যে আপনার অন্য একটি পণ্যে ব্যবহার করা হয়েছে",
-      });
-      return;
-    }
-    throw err;
-  }
+  res.status(201).json(serializeProduct(row));
 });
 
 router.get("/products/barcode/:code", async (req, res): Promise<void> => {
@@ -112,7 +104,7 @@ router.get("/products/barcode/:code", async (req, res): Promise<void> => {
     .where(
       and(
         eq(productsTable.barcode, params.data.code),
-        eq(productsTable.userId, getUserId(req)),
+        eq(productsTable.shopId, requireShop(req).shopId),
       ),
     );
 
@@ -137,7 +129,7 @@ router.get("/products/:id", async (req, res): Promise<void> => {
     .where(
       and(
         eq(productsTable.id, params.data.id),
-        eq(productsTable.userId, getUserId(req)),
+        eq(productsTable.shopId, requireShop(req).shopId),
       ),
     );
 
@@ -179,7 +171,12 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   const [row] = await db
     .update(productsTable)
     .set(updates)
-    .where(eq(productsTable.id, params.data.id))
+    .where(
+      and(
+        eq(productsTable.id, params.data.id),
+        eq(productsTable.shopId, requireRole(req, "shopkeeper").shopId),
+      ),
+    )
     .returning();
 
   if (!row) {
@@ -197,7 +194,15 @@ router.delete("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  await db.delete(productsTable).where(eq(productsTable.id, params.data.id));
+  const { shopId } = requireRole(req, "manager");
+  await db
+    .delete(productsTable)
+    .where(
+      and(
+        eq(productsTable.id, params.data.id),
+        eq(productsTable.shopId, shopId),
+      ),
+    );
   res.sendStatus(204);
 });
 

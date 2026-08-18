@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter"
-import { Home, ShoppingCart, Package, Users, BarChart3, LogOut } from "lucide-react"
+import { Home, ShoppingCart, Package, Users, BarChart3, Wallet, LogOut } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { VoiceAssistant } from "./voice-assistant"
 import { useClerk, useUser } from "@clerk/react"
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/app/billing", label: "বিলিং", icon: ShoppingCart },
   { href: "/app/inventory", label: "ইনভেন্টরি", icon: Package },
   { href: "/app/customers", label: "কাস্টমার", icon: Users },
+  { href: "/app/cashbox", label: "ক্যাশ বক্স", icon: Wallet },
   { href: "/app/reports", label: "রিপোর্ট", icon: BarChart3 },
 ]
 

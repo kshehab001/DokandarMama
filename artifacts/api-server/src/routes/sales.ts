@@ -14,7 +14,7 @@ import {
   ListSalesQueryParams,
 } from "@workspace/api-zod";
 import { RouteError, toNum } from "../lib/numeric";
-import { getUserId } from "../lib/auth";
+import { requireRole, requireShop } from "../lib/tenant";
 
 const router: IRouter = Router();
 
@@ -50,9 +50,9 @@ router.get("/sales", async (req, res): Promise<void> => {
     return;
   }
   const { from, to, customerId } = parsed.data;
-  const userId = getUserId(req);
+  const { shopId } = requireShop(req);
 
-  const conditions = [eq(salesTable.userId, userId)];
+  const conditions = [eq(salesTable.shopId, shopId)];
   if (from) conditions.push(gte(salesTable.createdAt, new Date(from)));
   if (to) conditions.push(lte(salesTable.createdAt, new Date(to)));
   if (customerId !== undefined)
@@ -135,12 +135,12 @@ router.post("/sales", async (req, res): Promise<void> => {
   }
 
   try {
-    const userId = getUserId(req);
+    const { shopId, userId } = requireRole(req, "shopkeeper");
     const result = await db.transaction(async (tx) => {
       const productRows = await tx
         .select()
         .from(productsTable)
-        .where(eq(productsTable.userId, userId))
+        .where(eq(productsTable.shopId, shopId))
         .for("update");
       const productMap = new Map(productRows.map((p) => [p.id, p]));
 
@@ -172,7 +172,7 @@ router.post("/sales", async (req, res): Promise<void> => {
           .where(
             and(
               eq(customersTable.id, customerId),
-              eq(customersTable.userId, userId),
+              eq(customersTable.shopId, shopId),
             ),
           );
         if (!customer) {
@@ -184,6 +184,7 @@ router.post("/sales", async (req, res): Promise<void> => {
         .insert(salesTable)
         .values({
           userId,
+          shopId,
           customerId: customerId ?? null,
           customerName: parsed.data.customerName ?? null,
           customerPhone: parsed.data.customerPhone ?? null,
@@ -206,7 +207,6 @@ router.post("/sales", async (req, res): Promise<void> => {
               productName: product.name,
               quantity: String(item.quantity),
               unitPrice: String(item.unitPrice),
-              costPrice: product.costPrice,
               lineTotal: String(item.quantity * item.unitPrice),
             };
           }),
@@ -222,7 +222,7 @@ router.post("/sales", async (req, res): Promise<void> => {
           .where(
             and(
               eq(productsTable.id, productId),
-              eq(productsTable.userId, userId),
+              eq(productsTable.shopId, shopId),
             ),
           );
       }
@@ -234,7 +234,7 @@ router.post("/sales", async (req, res): Promise<void> => {
           .where(
             and(
               eq(customersTable.id, customerId),
-              eq(customersTable.userId, userId),
+              eq(customersTable.shopId, shopId),
             ),
           );
 
@@ -245,12 +245,13 @@ router.post("/sales", async (req, res): Promise<void> => {
           .where(
             and(
               eq(customersTable.id, customerId),
-              eq(customersTable.userId, userId),
+              eq(customersTable.shopId, shopId),
             ),
           );
 
         await tx.insert(ledgerEntriesTable).values({
           userId,
+          shopId,
           customerId,
           type: "sale",
           amount: String(dueAmount),
@@ -285,7 +286,7 @@ router.get("/sales/:id", async (req, res): Promise<void> => {
     .where(
       and(
         eq(salesTable.id, params.data.id),
-        eq(salesTable.userId, getUserId(req)),
+        eq(salesTable.shopId, requireShop(req).shopId),
       ),
     );
 
@@ -303,4 +304,3 @@ router.get("/sales/:id", async (req, res): Promise<void> => {
 });
 
 export default router;
-

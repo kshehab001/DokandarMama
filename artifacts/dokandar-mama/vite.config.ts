@@ -1,4 +1,4 @@
-﻿import path from 'path';
+import path from 'path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
@@ -65,13 +65,14 @@ export default defineConfig({
     port,
     strictPort: true,
     host: '0.0.0.0',
-    allowedHosts: true,
+
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
       },
     },
+    allowedHosts: true,
     fs: {
       strict: true,
     },
@@ -82,3 +83,4 @@ export default defineConfig({
     allowedHosts: true,
   },
 });
+

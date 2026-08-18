@@ -17,4 +17,6 @@ export interface SaleInput {
   /** @minimum 0 */
   paidAmount: number;
   paymentMethod: SaleInputPaymentMethod;
+  digitalAmount?: number;
+  digitalProvider?: string | null;
 }

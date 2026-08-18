@@ -9,9 +9,16 @@ import {
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { customersTable } from "./customers";
+import { shopsTable } from "./shops";
 
 export const ledgerEntriesTable = pgTable("ledger_entries", {
   id: serial("id").primaryKey(),
+  // Tenant boundary: the shop this row belongs to. Nullable only so existing
+  // pre-multi-tenant rows can be backfilled on first shop creation; the API
+  // layer always writes it and always filters on it.
+  shopId: integer("shop_id").references(() => shopsTable.id, {
+    onDelete: "cascade",
+  }),
   // Clerk user ID of the shopkeeper who owns this ledger entry (denormalized
   // from the customer for simple, join-free filtering in the ledger route).
   userId: text("user_id").notNull(),
@@ -32,6 +39,7 @@ export const insertLedgerEntrySchema = createInsertSchema(
 ).omit({
   id: true,
   userId: true,
+  shopId: true,
   createdAt: true,
 });
 export type InsertLedgerEntry = z.infer<typeof insertLedgerEntrySchema>;

@@ -9,7 +9,7 @@ import {
 } from "@workspace/db";
 import { GetSalesSummaryQueryParams, GetTopProductsQueryParams } from "@workspace/api-zod";
 import { toNum } from "../lib/numeric";
-import { getUserId } from "../lib/auth";
+import { requireShop } from "../lib/tenant";
 
 const router: IRouter = Router();
 
@@ -29,16 +29,16 @@ function rangeStart(range: "today" | "week" | "month"): Date {
 }
 
 router.get("/dashboard/overview", async (req, res): Promise<void> => {
-  const userId = getUserId(req);
+  const { shopId } = requireShop(req);
   const todayStart = rangeStart("today");
 
   const [allSales, allCustomers, allProducts] = await Promise.all([
     db
       .select()
       .from(salesTable)
-      .where(and(eq(salesTable.userId, userId), gte(salesTable.createdAt, todayStart))),
-    db.select().from(customersTable).where(eq(customersTable.userId, userId)),
-    db.select().from(productsTable).where(eq(productsTable.userId, userId)),
+      .where(and(eq(salesTable.shopId, shopId), gte(salesTable.createdAt, todayStart))),
+    db.select().from(customersTable).where(eq(customersTable.shopId, shopId)),
+    db.select().from(productsTable).where(eq(productsTable.shopId, shopId)),
   ]);
 
   const todaySalesTotal = allSales.reduce((sum, s) => sum + toNum(s.total), 0);
@@ -66,15 +66,15 @@ router.get("/reports/summary", async (req, res): Promise<void> => {
     return;
   }
   const { range } = parsed.data;
-  const userId = getUserId(req);
+  const { shopId } = requireShop(req);
   const start = rangeStart(range);
 
   const [sales, products] = await Promise.all([
     db
       .select()
       .from(salesTable)
-      .where(and(eq(salesTable.userId, userId), gte(salesTable.createdAt, start))),
-    db.select().from(productsTable).where(eq(productsTable.userId, userId)),
+      .where(and(eq(salesTable.shopId, shopId), gte(salesTable.createdAt, start))),
+    db.select().from(productsTable).where(eq(productsTable.shopId, shopId)),
   ]);
 
   const saleIdsInRange = sales.map((s) => s.id);
@@ -91,8 +91,9 @@ router.get("/reports/summary", async (req, res): Promise<void> => {
 
   const totalSales = sales.reduce((sum, s) => sum + toNum(s.total), 0);
   const totalProfit = itemsInRange.reduce((sum, item) => {
-    if (item.costPrice === null || item.costPrice === undefined) return sum;
-    return sum + (toNum(item.unitPrice) - toNum(item.costPrice)) * toNum(item.quantity);
+    const cost = costByProduct.get(item.productId);
+    if (cost === null || cost === undefined) return sum;
+    return sum + (toNum(item.unitPrice) - cost) * toNum(item.quantity);
   }, 0);
   const cashTotal = sales
     .filter((s) => s.paymentMethod !== "baki")
@@ -116,13 +117,13 @@ router.get("/reports/top-products", async (req, res): Promise<void> => {
     return;
   }
   const { range } = parsed.data;
-  const userId = getUserId(req);
+  const { shopId } = requireShop(req);
   const start = rangeStart(range);
 
   const sales = await db
     .select()
     .from(salesTable)
-    .where(and(eq(salesTable.userId, userId), gte(salesTable.createdAt, start)));
+    .where(and(eq(salesTable.shopId, shopId), gte(salesTable.createdAt, start)));
 
   const saleIdsInRange = sales.map((s) => s.id);
   const itemsInRange =
@@ -157,15 +158,15 @@ router.get("/reports/top-products", async (req, res): Promise<void> => {
 });
 
 router.get("/suggestions/restock", async (req, res): Promise<void> => {
-  const userId = getUserId(req);
+  const { shopId } = requireShop(req);
   const thirtyDaysAgo = rangeStart("month");
 
   const [products, sales] = await Promise.all([
-    db.select().from(productsTable).where(eq(productsTable.userId, userId)),
+    db.select().from(productsTable).where(eq(productsTable.shopId, shopId)),
     db
       .select()
       .from(salesTable)
-      .where(and(eq(salesTable.userId, userId), gte(salesTable.createdAt, thirtyDaysAgo))),
+      .where(and(eq(salesTable.shopId, shopId), gte(salesTable.createdAt, thirtyDaysAgo))),
   ]);
 
   const saleIdsInRange = sales.map((s) => s.id);
@@ -216,4 +217,3 @@ router.get("/suggestions/restock", async (req, res): Promise<void> => {
 });
 
 export default router;
-

@@ -17,13 +17,14 @@ import { Inventory } from '@/pages/inventory';
 import { Customers } from '@/pages/customers';
 import { Reports } from '@/pages/reports';
 import { Receipt } from '@/pages/receipt';
+import { Cashbox } from '@/pages/cashbox';
 import { Landing } from '@/pages/landing';
 import { SignInPage } from '@/pages/sign-in';
 import { SignUpPage } from '@/pages/sign-up';
 
 const queryClient = new QueryClient();
 
-// REQUIRED â€” copy verbatim. Resolves the key from window.location.hostname so the
+// REQUIRED — copy verbatim. Resolves the key from window.location.hostname so the
 // same build serves multiple Clerk custom domains. Do not inline the env var, leave
 // publishableKey undefined, or replace publishableKeyFromHost with anything else.
 const clerkPubKey = publishableKeyFromHost(
@@ -31,15 +32,15 @@ const clerkPubKey = publishableKeyFromHost(
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
 );
 
-// REQUIRED â€” copy verbatim. Empty in dev (Clerk hits dev FAPI directly), auto-set
-// in prod. Do NOT gate on import.meta.env.PROD / NODE_ENV â€” the empty dev value
+// REQUIRED — copy verbatim. Empty in dev (Clerk hits dev FAPI directly), auto-set
+// in prod. Do NOT gate on import.meta.env.PROD / NODE_ENV — the empty dev value
 // is intentional, and any branching breaks the prod proxy.
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 // Clerk passes full paths to routerPush/routerReplace, but wouter's
-// setLocation prepends the base â€” strip it to avoid doubling.
+// setLocation prepends the base — strip it to avoid doubling.
 function stripBase(path: string): string {
   return basePath && path.startsWith(basePath)
     ? path.slice(basePath.length) || '/'
@@ -114,7 +115,7 @@ function HomeRedirect() {
 
 // Every authenticated screen goes through here, which is what guarantees
 // the Layout's home/billing nav (bottom bar on mobile, sidebar on desktop)
-// is present on every page â€” previously only "/app" was wrapped in Layout,
+// is present on every page — previously only "/app" was wrapped in Layout,
 // so Billing/Inventory/Customers/Reports/Receipt rendered with no nav at
 // all and back-button was the only way around.
 function AuthedRoute({ children }: { children: React.ReactNode }) {
@@ -138,7 +139,7 @@ function Router() {
     <Switch>
       <Route path="/" component={HomeRedirect} />
 
-      {/* REQUIRED â€” copy "/sign-in/*?" and "/sign-up/*?" verbatim. */}
+      {/* REQUIRED — copy "/sign-in/*?" and "/sign-up/*?" verbatim. */}
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
 
@@ -160,6 +161,11 @@ function Router() {
       <Route path="/app/customers">
         <AuthedRoute>
           <Customers />
+        </AuthedRoute>
+      </Route>
+      <Route path="/app/cashbox">
+        <AuthedRoute>
+          <Cashbox />
         </AuthedRoute>
       </Route>
       <Route path="/app/reports">
@@ -201,10 +207,6 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
-// Wires the signed-in user's Clerk session token into every backend API
-// call. Additive/safe: only sets an Authorization header when a token
-// getter is configured; production's cookie-based auth still works as
-// before if this ever returns null.
 function ClerkAuthTokenWiring() {
   const { getToken } = useAuth();
 
@@ -264,4 +266,3 @@ function App() {
 }
 
 export default App;
-

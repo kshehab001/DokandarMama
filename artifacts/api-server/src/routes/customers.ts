@@ -13,7 +13,7 @@ import {
   UpdateCustomerParams,
 } from "@workspace/api-zod";
 import { RouteError, toNum } from "../lib/numeric";
-import { getUserId } from "../lib/auth";
+import { requireRole, requireShop } from "../lib/tenant";
 
 const router: IRouter = Router();
 
@@ -46,9 +46,9 @@ router.get("/customers", async (req, res): Promise<void> => {
     return;
   }
   const { search, withDueOnly } = parsed.data;
-  const userId = getUserId(req);
+  const { shopId } = requireShop(req);
 
-  const conditions = [eq(customersTable.userId, userId)];
+  const conditions = [eq(customersTable.shopId, shopId)];
   if (search) {
     conditions.push(ilike(customersTable.name, `%${search}%`));
   }
@@ -72,10 +72,12 @@ router.post("/customers", async (req, res): Promise<void> => {
     return;
   }
 
+  const shopCtx = requireRole(req, "shopkeeper");
   const [row] = await db
     .insert(customersTable)
     .values({
-      userId: getUserId(req),
+      userId: shopCtx.userId,
+      shopId: shopCtx.shopId,
       name: parsed.data.name,
       phone: parsed.data.phone ?? null,
     })
@@ -97,7 +99,7 @@ router.get("/customers/:id", async (req, res): Promise<void> => {
     .where(
       and(
         eq(customersTable.id, params.data.id),
-        eq(customersTable.userId, getUserId(req)),
+        eq(customersTable.shopId, requireShop(req).shopId),
       ),
     );
 
@@ -132,7 +134,7 @@ router.patch("/customers/:id", async (req, res): Promise<void> => {
     .where(
       and(
         eq(customersTable.id, params.data.id),
-        eq(customersTable.userId, getUserId(req)),
+        eq(customersTable.shopId, requireShop(req).shopId),
       ),
     )
     .returning();
@@ -157,7 +159,7 @@ router.delete("/customers/:id", async (req, res): Promise<void> => {
     .where(
       and(
         eq(customersTable.id, params.data.id),
-        eq(customersTable.userId, getUserId(req)),
+        eq(customersTable.shopId, requireShop(req).shopId),
       ),
     );
   res.sendStatus(204);
@@ -169,7 +171,7 @@ router.get("/customers/:id/ledger", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const userId = getUserId(req);
+  const { shopId } = requireShop(req);
 
   // Confirm the customer belongs to this shopkeeper before returning any
   // ledger rows, so one shop can't read another's ledger via a guessed ID.
@@ -177,7 +179,7 @@ router.get("/customers/:id/ledger", async (req, res): Promise<void> => {
     .select()
     .from(customersTable)
     .where(
-      and(eq(customersTable.id, params.data.id), eq(customersTable.userId, userId)),
+      and(eq(customersTable.id, params.data.id), eq(customersTable.shopId, shopId)),
     );
   if (!customer) {
     res.status(404).json({ error: "Customer not found" });
@@ -190,7 +192,7 @@ router.get("/customers/:id/ledger", async (req, res): Promise<void> => {
     .where(
       and(
         eq(ledgerEntriesTable.customerId, params.data.id),
-        eq(ledgerEntriesTable.userId, userId),
+        eq(ledgerEntriesTable.shopId, shopId),
       ),
     )
     .orderBy(desc(ledgerEntriesTable.createdAt));
@@ -212,7 +214,7 @@ router.post("/customers/:id/payments", async (req, res): Promise<void> => {
   }
 
   try {
-    const userId = getUserId(req);
+    const { shopId, userId } = requireShop(req);
     const updatedCustomer = await db.transaction(async (tx) => {
       const [customer] = await tx
         .select()
@@ -220,7 +222,7 @@ router.post("/customers/:id/payments", async (req, res): Promise<void> => {
         .where(
           and(
             eq(customersTable.id, params.data.id),
-            eq(customersTable.userId, userId),
+            eq(customersTable.shopId, shopId),
           ),
         )
         .for("update");
@@ -244,13 +246,14 @@ router.post("/customers/:id/payments", async (req, res): Promise<void> => {
         .where(
           and(
             eq(customersTable.id, params.data.id),
-            eq(customersTable.userId, userId),
+            eq(customersTable.shopId, shopId),
           ),
         )
         .returning();
 
       await tx.insert(ledgerEntriesTable).values({
         userId,
+        shopId,
         customerId: params.data.id,
         type: "payment",
         amount: String(parsed.data.amount),

@@ -18,6 +18,18 @@ tags:
     description: Billing and sales
   - name: reports
     description: Sales reports, dashboard, and restock suggestions
+  - name: shops
+    description: Shops, branches and team roles
+  - name: organization
+    description: Chain / super shop organization
+  - name: master-products
+    description: Global barcode product catalogue
+  - name: cashbox
+    description: Cash drawer sessions, expenses and reconciliation
+  - name: purchases
+    description: Purchase invoice OCR and stock updates
+  - name: subscription
+    description: Subscription plans
 paths:
   /healthz:
     get:
@@ -384,8 +396,761 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/RestockSuggestion" }
 
+  /shops:
+    get:
+      operationId: listShops
+      tags: [shops]
+      summary: Shops the signed-in user belongs to
+      responses:
+        "200":
+          description: Shops
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ShopWithRole" }
+    post:
+      operationId: createShop
+      tags: [shops]
+      summary: Create the user's shop (onboarding)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShopInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Shop" }
+
+  /shops/current:
+    get:
+      operationId: getCurrentShop
+      tags: [shops]
+      summary: Active shop, role and organization
+      responses:
+        "200":
+          description: Current shop
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CurrentShop" }
+    patch:
+      operationId: updateCurrentShop
+      tags: [shops]
+      summary: Update shop settings (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShopUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Shop" }
+
+  /shops/branches:
+    post:
+      operationId: createBranch
+      tags: [shops]
+      summary: Add a branch to the organization (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShopInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Shop" }
+
+  /shops/current/members:
+    get:
+      operationId: listShopMembers
+      tags: [shops]
+      summary: Team members of the active shop
+      responses:
+        "200":
+          description: Members
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ShopMember" }
+    post:
+      operationId: addShopMember
+      tags: [shops]
+      summary: Add or update a team member (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ShopMemberInput" }
+      responses:
+        "201":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ShopMember" }
+
+  /shops/current/members/{id}:
+    delete:
+      operationId: removeShopMember
+      tags: [shops]
+      summary: Remove a team member (admin)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Removed
+
+  /organization:
+    get:
+      operationId: getOrganization
+      tags: [organization]
+      summary: Organization and its branches
+      responses:
+        "200":
+          description: Organization
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrganizationInfo" }
+
+  /organization/summary:
+    get:
+      operationId: getOrganizationSummary
+      tags: [organization]
+      summary: Sales summary per branch
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Summary
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/OrganizationSummary" }
+
+  /master-products:
+    get:
+      operationId: searchMasterProducts
+      tags: [master-products]
+      summary: Search the global product catalogue
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Matches
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MasterProduct" }
+
+  /master-products/lookup:
+    get:
+      operationId: lookupMasterProduct
+      tags: [master-products]
+      summary: Barcode lookup in the global catalogue
+      parameters:
+        - name: barcode
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MasterProduct" }
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /cashbox/current:
+    get:
+      operationId: getCashboxState
+      tags: [cashbox]
+      summary: Current cash drawer state
+      responses:
+        "200":
+          description: Cash box state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CashboxState" }
+
+  /cashbox/open:
+    post:
+      operationId: openCashbox
+      tags: [cashbox]
+      summary: Open the drawer with an opening balance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CashboxOpenInput" }
+      responses:
+        "201":
+          description: Opened
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CashSession" }
+
+  /cashbox/movements:
+    post:
+      operationId: addCashMovement
+      tags: [cashbox]
+      summary: Record an expense or manual cash movement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CashMovementInput" }
+      responses:
+        "201":
+          description: Recorded
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CashMovement" }
+
+  /cashbox/close:
+    post:
+      operationId: closeCashbox
+      tags: [cashbox]
+      summary: Close the drawer with counted cash
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CashboxCloseInput" }
+      responses:
+        "200":
+          description: Closed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CashSession" }
+
+  /cashbox/sessions:
+    get:
+      operationId: listCashSessions
+      tags: [cashbox]
+      summary: Cash session history
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CashSession" }
+
+  /purchases:
+    get:
+      operationId: listPurchaseInvoices
+      tags: [purchases]
+      summary: Purchase invoice history
+      responses:
+        "200":
+          description: Invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PurchaseInvoiceSummary" }
+    post:
+      operationId: createPurchaseInvoice
+      tags: [purchases]
+      summary: Submit invoice OCR text for parsing and matching
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PurchaseInvoiceInput" }
+      responses:
+        "201":
+          description: Parsed invoice
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseInvoice" }
+
+  /purchases/{id}:
+    get:
+      operationId: getPurchaseInvoice
+      tags: [purchases]
+      summary: Get a parsed invoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Invoice
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseInvoice" }
+
+  /purchases/{id}/confirm:
+    post:
+      operationId: confirmPurchaseInvoice
+      tags: [purchases]
+      summary: Confirm invoice lines and update inventory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PurchaseConfirmInput" }
+      responses:
+        "200":
+          description: Applied
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PurchaseConfirmResult" }
+
+  /subscription:
+    get:
+      operationId: getSubscription
+      tags: [subscription]
+      summary: Plan catalogue and current plan
+      responses:
+        "200":
+          description: Subscription state
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubscriptionState" }
+    post:
+      operationId: selectSubscriptionPlan
+      tags: [subscription]
+      summary: Record a plan selection (no payment yet)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SubscriptionSelectInput" }
+      responses:
+        "201":
+          description: Selected
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SubscriptionSelection" }
+
+  /customers/{id}/verify/send:
+    post:
+      operationId: sendCustomerVerification
+      tags: [customers]
+      summary: Send a verification code to the customer's phone
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Sent
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VerificationSendResult" }
+
+  /customers/{id}/verify/confirm:
+    post:
+      operationId: confirmCustomerVerification
+      tags: [customers]
+      summary: Confirm the verification code
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerificationConfirmInput" }
+      responses:
+        "200":
+          description: Verified
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Customer" }
+
+
 components:
   schemas:
+
+    Shop:
+      type: object
+      required: [id, name, category, subscriptionPlan, createdAt]
+      properties:
+        id: { type: integer }
+        organizationId: { type: ["integer", "null"] }
+        name: { type: string }
+        category: { type: string }
+        ownerName: { type: ["string", "null"] }
+        area: { type: ["string", "null"] }
+        subscriptionPlan: { type: string, enum: [basic, standard, premium, organization] }
+        cashboxAddon: { type: boolean }
+        createdAt: { type: string }
+
+    ShopWithRole:
+      allOf:
+        - $ref: "#/components/schemas/Shop"
+        - type: object
+          required: [role]
+          properties:
+            role: { type: string, enum: [admin, manager, shopkeeper] }
+
+    ShopInput:
+      type: object
+      required: [name, category]
+      properties:
+        name: { type: string, minLength: 1 }
+        category: { type: string }
+        ownerName: { type: string }
+        area: { type: string }
+        organizationName: { type: string }
+
+    ShopUpdate:
+      type: object
+      properties:
+        name: { type: string, minLength: 1 }
+        category: { type: string }
+        ownerName: { type: string }
+        area: { type: string }
+        subscriptionPlan: { type: string, enum: [basic, standard, premium, organization] }
+        cashboxAddon: { type: boolean }
+
+    CurrentShop:
+      type: object
+      properties:
+        shop:
+          oneOf:
+            - $ref: "#/components/schemas/Shop"
+            - type: "null"
+        role: { type: ["string", "null"], enum: [admin, manager, shopkeeper, null] }
+        organization:
+          oneOf:
+            - $ref: "#/components/schemas/OrganizationRef"
+            - type: "null"
+
+    OrganizationRef:
+      type: object
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+
+    ShopMember:
+      type: object
+      required: [id, userId, role]
+      properties:
+        id: { type: integer }
+        userId: { type: string }
+        name: { type: ["string", "null"] }
+        role: { type: string, enum: [admin, manager, shopkeeper] }
+        createdAt: { type: string }
+
+    ShopMemberInput:
+      type: object
+      required: [userId, role]
+      properties:
+        userId: { type: string, minLength: 1 }
+        name: { type: string }
+        role: { type: string, enum: [admin, manager, shopkeeper] }
+
+    OrganizationInfo:
+      type: object
+      required: [branches]
+      properties:
+        organization:
+          oneOf:
+            - $ref: "#/components/schemas/OrganizationRef"
+            - type: "null"
+        branches:
+          type: array
+          items:
+            type: object
+            required: [id, name, category, isCurrent]
+            properties:
+              id: { type: integer }
+              name: { type: string }
+              category: { type: string }
+              area: { type: ["string", "null"] }
+              isCurrent: { type: boolean }
+
+    OrganizationSummary:
+      type: object
+      required: [days, branches, grandTotal, grandDue]
+      properties:
+        days: { type: integer }
+        grandTotal: { type: number }
+        grandDue: { type: number }
+        branches:
+          type: array
+          items:
+            type: object
+            required: [shopId, name, totalSales, totalDue, transactions, staffCount]
+            properties:
+              shopId: { type: integer }
+              name: { type: string }
+              totalSales: { type: number }
+              totalDue: { type: number }
+              transactions: { type: integer }
+              staffCount: { type: integer }
+
+    MasterProduct:
+      type: object
+      required: [id, barcode, name]
+      properties:
+        id: { type: integer }
+        barcode: { type: string }
+        name: { type: string }
+        nameBn: { type: ["string", "null"] }
+        brand: { type: ["string", "null"] }
+        category: { type: ["string", "null"] }
+        unit: { type: ["string", "null"] }
+        defaultPrice: { type: ["number", "null"] }
+        imageUrl: { type: ["string", "null"] }
+
+    CashSession:
+      type: object
+      required: [id, status, openingBalance, openedAt]
+      properties:
+        id: { type: integer }
+        status: { type: string, enum: [open, closed] }
+        openingBalance: { type: number }
+        expectedClosing: { type: ["number", "null"] }
+        countedClosing: { type: ["number", "null"] }
+        difference: { type: ["number", "null"] }
+        note: { type: ["string", "null"] }
+        openedAt: { type: string }
+        closedAt: { type: ["string", "null"] }
+
+    CashMovement:
+      type: object
+      required: [id, type, amount, createdAt]
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [sale, expense, cash_in, cash_out] }
+        amount: { type: number }
+        note: { type: ["string", "null"] }
+        saleId: { type: ["integer", "null"] }
+        createdAt: { type: string }
+
+    CashboxTotals:
+      type: object
+      required: [cashSales, cashIn, expenses, cashOut, net]
+      properties:
+        cashSales: { type: number }
+        cashIn: { type: number }
+        expenses: { type: number }
+        cashOut: { type: number }
+        net: { type: number }
+
+    CashboxState:
+      type: object
+      required: [movements]
+      properties:
+        session:
+          oneOf:
+            - $ref: "#/components/schemas/CashSession"
+            - type: "null"
+        totals:
+          oneOf:
+            - $ref: "#/components/schemas/CashboxTotals"
+            - type: "null"
+        expectedClosing: { type: ["number", "null"] }
+        movements:
+          type: array
+          items: { $ref: "#/components/schemas/CashMovement" }
+
+    CashboxOpenInput:
+      type: object
+      required: [openingBalance]
+      properties:
+        openingBalance: { type: number, minimum: 0 }
+        note: { type: string }
+
+    CashMovementInput:
+      type: object
+      required: [type, amount]
+      properties:
+        type: { type: string, enum: [expense, cash_in, cash_out] }
+        amount: { type: number, minimum: 0 }
+        note: { type: string }
+
+    CashboxCloseInput:
+      type: object
+      required: [countedClosing]
+      properties:
+        countedClosing: { type: number, minimum: 0 }
+        note: { type: string }
+
+    PurchaseInvoiceInput:
+      type: object
+      required: [rawText]
+      properties:
+        rawText: { type: string, minLength: 1 }
+        imageUrl: { type: string }
+        supplierName: { type: string }
+
+    PurchaseInvoiceSummary:
+      type: object
+      required: [id, status, createdAt]
+      properties:
+        id: { type: integer }
+        supplierName: { type: ["string", "null"] }
+        status: { type: string, enum: [uploaded, parsed, confirmed, failed] }
+        invoiceTotal: { type: ["number", "null"] }
+        createdAt: { type: string }
+        confirmedAt: { type: ["string", "null"] }
+
+    PurchaseInvoiceItem:
+      type: object
+      required: [id, name, quantity, status]
+      properties:
+        id: { type: integer }
+        rawText: { type: ["string", "null"] }
+        name: { type: string }
+        quantity: { type: number }
+        unitCost: { type: ["number", "null"] }
+        lineTotal: { type: ["number", "null"] }
+        matchedProductId: { type: ["integer", "null"] }
+        status: { type: string, enum: [pending, matched, new, skipped] }
+        suggestions:
+          type: array
+          items:
+            type: object
+            required: [productId, name, score]
+            properties:
+              productId: { type: integer }
+              name: { type: string }
+              score: { type: number }
+
+    PurchaseInvoice:
+      allOf:
+        - $ref: "#/components/schemas/PurchaseInvoiceSummary"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: "#/components/schemas/PurchaseInvoiceItem" }
+
+    PurchaseConfirmInput:
+      type: object
+      required: [items]
+      properties:
+        supplierName: { type: string }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [name, quantity]
+            properties:
+              name: { type: string, minLength: 1 }
+              quantity: { type: number }
+              unitCost: { type: ["number", "null"] }
+              productId: { type: ["integer", "null"] }
+              createNew: { type: boolean }
+              skip: { type: boolean }
+              sellPrice: { type: number }
+              unit: { type: string }
+              category: { type: string }
+
+    PurchaseConfirmResult:
+      type: object
+      required: [id, status, updatedProducts, createdProducts]
+      properties:
+        id: { type: integer }
+        status: { type: string }
+        updatedProducts: { type: integer }
+        createdProducts: { type: integer }
+
+    SubscriptionPlanInfo:
+      type: object
+      required: [id, name, features]
+      properties:
+        id: { type: string, enum: [basic, standard, premium, organization] }
+        name: { type: string }
+        price: { type: ["number", "null"] }
+        features:
+          type: array
+          items: { type: string }
+
+    SubscriptionState:
+      type: object
+      required: [plans, currentPlan]
+      properties:
+        plans:
+          type: array
+          items: { $ref: "#/components/schemas/SubscriptionPlanInfo" }
+        currentPlan: { type: string, enum: [basic, standard, premium, organization] }
+        role: { type: ["string", "null"] }
+        history:
+          type: array
+          items:
+            type: object
+            required: [id, plan, status, startedAt]
+            properties:
+              id: { type: integer }
+              plan: { type: string }
+              status: { type: string }
+              startedAt: { type: string }
+              expiresAt: { type: ["string", "null"] }
+
+    SubscriptionSelectInput:
+      type: object
+      required: [plan]
+      properties:
+        plan: { type: string, enum: [basic, standard, premium, organization] }
+
+    SubscriptionSelection:
+      type: object
+      required: [id, plan, status, startedAt, paymentRequired]
+      properties:
+        id: { type: integer }
+        plan: { type: string }
+        status: { type: string }
+        startedAt: { type: string }
+        paymentRequired: { type: boolean }
+
+    VerificationSendResult:
+      type: object
+      required: [sent, customerId]
+      properties:
+        sent: { type: boolean }
+        customerId: { type: integer }
+        message: { type: string }
+        devCode: { type: string }
+
+    VerificationConfirmInput:
+      type: object
+      required: [code]
+      properties:
+        code: { type: string, minLength: 4, maxLength: 8 }
     HealthStatus:
       type: object
       properties:
@@ -462,6 +1227,8 @@ components:
         name: { type: string }
         phone: { type: ["string", "null"] }
         bakiBalance: { type: number }
+        phoneVerified: { type: boolean }
+        verifiedAt: { type: ["string", "null"] }
         createdAt: { type: string }
 
     CustomerInput:
@@ -526,7 +1293,9 @@ components:
           minItems: 1
           items: { $ref: "#/components/schemas/SaleItemInput" }
         paidAmount: { type: number, minimum: 0 }
-        paymentMethod: { type: string, enum: [cash, baki, mixed] }
+        paymentMethod: { type: string, enum: [cash, baki, mixed, digital] }
+        digitalAmount: { type: number }
+        digitalProvider: { type: string, nullable: true }
 
     Sale:
       type: object
@@ -553,7 +1322,9 @@ components:
         total: { type: number }
         paidAmount: { type: number }
         dueAmount: { type: number }
-        paymentMethod: { type: string, enum: [cash, baki, mixed] }
+        paymentMethod: { type: string, enum: [cash, baki, mixed, digital] }
+        digitalAmount: { type: number }
+        digitalProvider: { type: string, nullable: true }
         createdAt: { type: string }
 
     DashboardOverview:

@@ -90,12 +90,6 @@ export function Inventory() {
           queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() })
           toast({ title: "নতুন পণ্য যোগ করা হয়েছে" })
           setIsFormOpen(false)
-        },
-        onError: (err: any) => {
-          toast({
-            title: err?.data?.error || "পণ্য যোগ করা যায়নি",
-            variant: "destructive"
-          })
         }
       })
     }

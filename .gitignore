@@ -1,17 +1,13 @@
-# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# compiled output
 dist
 tmp
 out-tsc
 *.tsbuildinfo
 .expo
 .expo-shared
-
-# dependencies
 node_modules
 
-# IDEs and editors
 /.idea
 .project
 .classpath
@@ -19,15 +15,11 @@ node_modules
 *.launch
 .settings/
 *.sublime-workspace
-
-# IDE - VSCode
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
-!.vscode/launch.json
 !.vscode/extensions.json
 
-# misc
 /.sass-cache
 /connect.lock
 /coverage
@@ -37,20 +29,25 @@ yarn-error.log
 testem.log
 /typings
 
-# System Files
 .DS_Store
 Thumbs.db
 
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
-# Replit
 .cache/
 .local/
 
-# Env files with real secrets — never commit
+# Environment files containing secrets
 .env
-.env.local
-.env.txt
-.env.local.txt.txt
+.env.*
+*.env
+*.env.*
 !.env.example
+
+# Local troubleshooting / alternate package manager files
+gitfulltrace.txt
+gitoutput.txt
+gitoutput2.txt
+bun.lock
+

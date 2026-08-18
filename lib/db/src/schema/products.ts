@@ -1,56 +1,62 @@
 import {
   boolean,
+  integer,
   numeric,
   pgTable,
   serial,
   text,
   timestamp,
-  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+import { shopsTable } from "./shops";
+import { masterProductsTable } from "./masterProducts";
 
-export const productsTable = pgTable(
-  "products",
-  {
-    id: serial("id").primaryKey(),
-    // Clerk user ID of the shopkeeper who owns this product. Every query in
-    // the API layer must filter/insert on this column — see api-server's
-    // requireAuth + getUserId. Without it, all shopkeepers share one catalog.
-    userId: text("user_id").notNull(),
-    name: text("name").notNull(),
-    barcode: text("barcode"),
-    category: text("category").notNull(),
-    unit: text("unit").notNull(),
-    price: numeric("price", { precision: 12, scale: 2 }).notNull(),
-    costPrice: numeric("cost_price", { precision: 12, scale: 2 }),
-    stock: numeric("stock", { precision: 12, scale: 3 }).notNull().default("0"),
-    lowStockThreshold: numeric("low_stock_threshold", {
-      precision: 12,
-      scale: 3,
-    })
-      .notNull()
-      .default("5"),
-    isPriceVariable: boolean("is_price_variable").notNull().default(false),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow()
-      .$onUpdate(() => new Date()),
-  },
-  (table) => [
-    uniqueIndex("products_user_id_barcode_unique").on(
-      table.userId,
-      table.barcode
-    ),
-  ]
-);
+export const productsTable = pgTable("products", {
+  id: serial("id").primaryKey(),
+  // Tenant boundary: the shop this row belongs to. Nullable only so existing
+  // pre-multi-tenant rows can be backfilled on first shop creation; the API
+  // layer always writes it and always filters on it.
+  shopId: integer("shop_id").references(() => shopsTable.id, {
+    onDelete: "cascade",
+  }),
+  // Clerk user ID of the shopkeeper who owns this product. Every query in
+  // the API layer must filter/insert on this column — see api-server's
+  // requireAuth + getUserId. Without it, all shopkeepers share one catalog.
+  userId: text("user_id").notNull(),
+  name: text("name").notNull(),
+  barcode: text("barcode"),
+  category: text("category").notNull(),
+  unit: text("unit").notNull(),
+  price: numeric("price", { precision: 12, scale: 2 }).notNull(),
+  costPrice: numeric("cost_price", { precision: 12, scale: 2 }),
+  stock: numeric("stock", { precision: 12, scale: 3 }).notNull().default("0"),
+  lowStockThreshold: numeric("low_stock_threshold", {
+    precision: 12,
+    scale: 3,
+  })
+    .notNull()
+    .default("5"),
+  isPriceVariable: boolean("is_price_variable").notNull().default(false),
+  // Link to the global barcode catalogue when the item came from a scan.
+  masterProductId: integer("master_product_id").references(
+    () => masterProductsTable.id,
+    { onDelete: "set null" },
+  ),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
+});
 
 export const insertProductSchema = createInsertSchema(productsTable).omit({
   id: true,
   userId: true,
+  shopId: true,
+  masterProductId: true,
   createdAt: true,
   updatedAt: true,
 });

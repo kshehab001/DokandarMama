@@ -1,3 +1,4 @@
+import { RouteError } from "./lib/numeric";
 import express, { type Express } from "express";
 import path from "node:path";
 import fs from "node:fs";
@@ -7,6 +8,7 @@ import { clerkMiddleware } from "@clerk/express";
 import { publishableKeyFromHost } from "@clerk/shared/keys";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { collectDiagnostics } from "./lib/diagnostics";
 import {
   CLERK_PROXY_PATH,
   clerkProxyMiddleware,
@@ -41,6 +43,21 @@ app.use(
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
+
+// Deeper, still-unauthenticated diagnostics: which env vars are present and
+// whether the database and Clerk are actually reachable from this process.
+// Mounted before Clerk/CORS/DB wiring for the same reason as /health — it has
+// to answer even when that wiring is broken. Reports presence of secrets only,
+// never their values.
+const diagnosticsHandler = async (
+  _req: express.Request,
+  res: express.Response,
+) => {
+  const diagnostics = await collectDiagnostics();
+  res.status(diagnostics.status === "ok" ? 200 : 503).json(diagnostics);
+};
+app.get("/diagnostics", diagnosticsHandler);
+app.get("/api/diagnostics", diagnosticsHandler);
 
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
@@ -104,6 +121,29 @@ app.use(
 );
 
 app.use("/api", router);
+
+// Central error handler: tenancy/role failures (and any other RouteError)
+// become their intended HTTP status instead of a generic 500. Express 5
+// forwards rejected promises from async handlers here automatically.
+app.use(
+  (
+    err: unknown,
+    _req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    if (res.headersSent) {
+      next(err);
+      return;
+    }
+    if (err instanceof RouteError) {
+      res.status(err.status).json({ error: err.message });
+      return;
+    }
+    logger.error({ err }, "Unhandled API error");
+    res.status(500).json({ error: "Internal server error" });
+  },
+);
 
 // SPA fallback: any route that isn't an API call and didn't match a real
 // static file (client-side routing paths like /app/billing) resolves to

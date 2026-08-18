@@ -22,5 +22,7 @@ export interface Sale {
   paidAmount: number;
   dueAmount: number;
   paymentMethod: SalePaymentMethod;
+  digitalAmount?: number;
+  digitalProvider?: string | null;
   createdAt: string;
 }
