@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Dokandar Mama"
+version = "1.0.0"
+id = "artifacts/dokandar-mama"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25095
+
+[services.development]
+run = "pnpm --filter @workspace/dokandar-mama run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/dokandar-mama", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/dokandar-mama/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25095"
+BASE_PATH = "/"

@@ -1,0 +1,38 @@
+workflows:
+  android-release:
+    name: Dokandar Mama Android Release
+
+    environment:
+      node: 22
+      java: 17
+
+    scripts:
+      - name: Install pnpm
+        script: |
+          npm install -g pnpm
+
+      - name: Install dependencies
+        script: |
+          pnpm install
+
+      - name: Build web app
+        script: |
+          pnpm build
+
+      - name: Sync Capacitor Android
+        script: |
+          pnpm exec cap sync android
+
+      - name: Build APK
+        script: |
+          cd android
+          ./gradlew assembleRelease
+
+      - name: Build AAB for Play Store
+        script: |
+          cd android
+          ./gradlew bundleRelease
+
+    artifacts:
+      - android/app/build/outputs/**/*.apk
+      - android/app/build/outputs/**/*.aab

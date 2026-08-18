@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Dokandar Mama</string>
+    <string name="title_activity_main">Dokandar Mama</string>
+    <string name="package_name">com.dokandarmama.app</string>
+    <string name="custom_url_scheme">com.dokandarmama.app</string>
+</resources>

@@ -1,0 +1,32 @@
+workflows:
+  android-build:
+    name: Dokandar Mama Android APK
+    max_build_duration: 60
+
+    environment:
+      node: 24
+      java: 17
+
+    scripts:
+      - name: Install dependencies
+        script: |
+          corepack enable
+          pnpm install
+
+      - name: Build web app
+        script: |
+          cd artifacts/dokandar-mama
+          pnpm build
+
+      - name: Capacitor sync
+        script: |
+          cd artifacts/dokandar-mama
+          pnpm exec cap sync android
+
+      - name: Build APK
+        script: |
+          cd artifacts/dokandar-mama/android
+          ./gradlew assembleDebug
+
+    artifacts:
+      - artifacts/dokandar-mama/android/app/build/outputs/**/*.apk
