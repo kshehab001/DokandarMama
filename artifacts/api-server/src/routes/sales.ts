@@ -1,6 +1,8 @@
 import { Router, type IRouter } from "express";
-import { and, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import {
+  cashMovementsTable,
+  cashSessionsTable,
   customersTable,
   db,
   ledgerEntriesTable,
@@ -258,6 +260,32 @@ router.post("/sales", async (req, res): Promise<void> => {
           balanceAfter: String(newBalance),
           note: `বিল #${sale.id}`,
         });
+      }
+
+      if (paidAmount > 0) {
+        const [openSession] = await tx
+          .select()
+          .from(cashSessionsTable)
+          .where(
+            and(
+              eq(cashSessionsTable.shopId, shopId),
+              eq(cashSessionsTable.status, "open"),
+            ),
+          )
+          .orderBy(desc(cashSessionsTable.openedAt))
+          .limit(1);
+
+        if (openSession) {
+          await tx.insert(cashMovementsTable).values({
+            shopId,
+            sessionId: openSession.id,
+            type: "sale",
+            amount: String(paidAmount),
+            note: `বিল #${sale.id} বিক্রি`,
+            saleId: sale.id,
+            createdByUserId: userId,
+          });
+        }
       }
 
       return { sale, insertedItems };

@@ -1,4 +1,4 @@
-﻿import {
+import {
   integer,
   numeric,
   pgTable,
@@ -9,9 +9,13 @@
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { customersTable } from "./customers";
+import { shopsTable } from "./shops";
 
 export const salesTable = pgTable("sales", {
   id: serial("id").primaryKey(),
+  shopId: integer("shop_id").references(() => shopsTable.id, {
+    onDelete: "cascade",
+  }),
   // Clerk user ID of the shopkeeper who made this sale.
   userId: text("user_id").notNull(),
   customerId: integer("customer_id").references(() => customersTable.id, {
@@ -26,7 +30,7 @@ export const salesTable = pgTable("sales", {
     .notNull()
     .default("0"),
   paymentMethod: text("payment_method", {
-    enum: ["cash", "baki", "mixed"],
+    enum: ["cash", "baki", "mixed", "digital"],
   }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

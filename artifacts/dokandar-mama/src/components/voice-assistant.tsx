@@ -10,6 +10,7 @@ import {
   useGetSalesSummary,
   useGetTopProducts,
   useGetRestockSuggestions,
+  useGetCashboxState,
   useCreateSale,
   useRecordCustomerPayment,
   getListProductsQueryKey,
@@ -18,6 +19,7 @@ import {
   getGetSalesSummaryQueryKey,
   getGetTopProductsQueryKey,
   getGetRestockSuggestionsQueryKey,
+  getGetCashboxStateQueryKey,
 } from "@workspace/api-client-react"
 
 // Bangla digits <-> Latin digits, so spoken/typed numerals of either script work.
@@ -75,6 +77,7 @@ export function VoiceAssistant() {
   const { data: weekSummary } = useGetSalesSummary({ range: "week" })
   const { data: topProducts } = useGetTopProducts({ range: "week" })
   const { data: restockSuggestions } = useGetRestockSuggestions()
+  const { data: cashboxState } = useGetCashboxState()
 
   const createSale = useCreateSale()
   const recordPayment = useRecordCustomerPayment()
@@ -89,6 +92,7 @@ export function VoiceAssistant() {
     queryClient.invalidateQueries({ queryKey: getGetSalesSummaryQueryKey() })
     queryClient.invalidateQueries({ queryKey: getGetTopProductsQueryKey() })
     queryClient.invalidateQueries({ queryKey: getGetRestockSuggestionsQueryKey() })
+    queryClient.invalidateQueries({ queryKey: getGetCashboxStateQueryKey() })
   }
 
   useEffect(() => {
@@ -372,8 +376,27 @@ export function VoiceAssistant() {
     }
 
     // Help / command list
-    if (query.includes("সাহায্য") || query.includes("হেল্প") || query.includes("কী কী বলতে পারি") || query.includes("কমান্ড")) {
+    if (query.includes("সাহায্য") || query.includes("হেল্প") || query.includes("কী কী বলতে পারি") || query.includes("কমান্ড") || query.includes("help")) {
       return HELP_TEXT
+    }
+
+    // Cash box / Drawer balance query
+    if (
+      query.includes("ক্যাশ বক্স") ||
+      query.includes("ক্যাশ বক্সে") ||
+      query.includes("ড্রয়ার") ||
+      query.includes("ড্রয়ারে") ||
+      query.includes("cash box") ||
+      query.includes("drawer")
+    ) {
+      if (!cashboxState?.session) {
+        return "আজকের ক্যাশ বক্স এখনো খোলা হয়নি। ড্যাশবোর্ড বা ক্যাশ বক্স পেজ থেকে শুরুর ব্যালেন্স দিয়ে ক্যাশ বক্স চালু করুন।"
+      }
+      const exp = cashboxState.expectedClosing ?? 0
+      const open = cashboxState.session.openingBalance ?? 0
+      const sales = cashboxState.totals?.cashSales ?? 0
+      const expns = cashboxState.totals?.expenses ?? 0
+      return `ক্যাশ বক্স চালু আছে। ড্রয়ারে থাকা উচিত ${exp} টাকা (শুরু ছিল ${open} টাকা, ক্যাশ বিক্রি ${sales} টাকা, খরচ হয়েছে ${expns} টাকা)।`
     }
 
     // Today's total sales

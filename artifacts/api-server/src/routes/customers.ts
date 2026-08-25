@@ -1,6 +1,12 @@
 import { Router, type IRouter } from "express";
 import { and, desc, eq, gt, ilike } from "drizzle-orm";
-import { customersTable, db, ledgerEntriesTable } from "@workspace/db";
+import {
+  cashMovementsTable,
+  cashSessionsTable,
+  customersTable,
+  db,
+  ledgerEntriesTable,
+} from "@workspace/db";
 import {
   CreateCustomerBody,
   DeleteCustomerParams,
@@ -260,6 +266,29 @@ router.post("/customers/:id/payments", async (req, res): Promise<void> => {
         balanceAfter: String(newBalance),
         note: parsed.data.note ?? null,
       });
+
+      const [openSession] = await tx
+        .select()
+        .from(cashSessionsTable)
+        .where(
+          and(
+            eq(cashSessionsTable.shopId, shopId),
+            eq(cashSessionsTable.status, "open"),
+          ),
+        )
+        .orderBy(desc(cashSessionsTable.openedAt))
+        .limit(1);
+
+      if (openSession) {
+        await tx.insert(cashMovementsTable).values({
+          shopId,
+          sessionId: openSession.id,
+          type: "cash_in",
+          amount: String(parsed.data.amount),
+          note: `${customer.name}-এর বাকি পরিশোধ`,
+          createdByUserId: userId,
+        });
+      }
 
       return updated;
     });

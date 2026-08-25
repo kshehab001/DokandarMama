@@ -193,18 +193,46 @@ export function Cashbox() {
                   </button>
                 ))}
               </div>
+              {movementType === "expense" && (
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {[
+                    "মালামাল ক্রয়",
+                    "চা-নাস্তা",
+                    "দোকান ভাড়া",
+                    "বিদ্যুৎ বিল",
+                    "দান/সদকা",
+                    "কর্মচারীর বেতন",
+                    "ব্যক্তিগত উত্তোলন",
+                    "অন্যান্য খরচ",
+                  ].map((chip) => (
+                    <button
+                      key={chip}
+                      type="button"
+                      onClick={() => setMovementNote(chip)}
+                      className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                        movementNote === chip
+                          ? "bg-destructive text-destructive-foreground font-bold border-destructive"
+                          : "bg-muted hover:bg-muted/80 text-foreground"
+                      }`}
+                    >
+                      {chip}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
+                  type="number"
                   inputMode="decimal"
                   value={movementAmount}
                   onChange={(e) => setMovementAmount(e.target.value)}
-                  placeholder="টাকার পরিমাণ"
-                  className="h-12 text-lg"
+                  placeholder="টাকার পরিমাণ (৳)"
+                  className="h-12 text-lg font-bold"
                 />
                 <Input
                   value={movementNote}
                   onChange={(e) => setMovementNote(e.target.value)}
-                  placeholder="বিবরণ (যেমন: চা, ভাড়া)"
+                  placeholder="বিবরণ (যেমন: চা, মালামাল, ভাড়া)"
                   className="h-12"
                 />
               </div>
