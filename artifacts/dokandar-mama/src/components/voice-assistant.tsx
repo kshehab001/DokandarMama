@@ -60,6 +60,11 @@ export function VoiceAssistant() {
   const keepAliveRef = useRef<number | null>(null)
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null)
   const voicesReadyRef = useRef(false)
+  // Fix 5: tracks whether we already ran processCommand from onresult/isFinal,
+  // so the onend fallback effect doesn't double-process.
+  const processedRef = useRef(false)
+  // Fix 4: tracks whether we already fell back from bn-BD → en-US.
+  const langFallbackRef = useRef(false)
 
   const queryClient = useQueryClient()
 
@@ -111,6 +116,16 @@ export function VoiceAssistant() {
         alternatives.push(event.results[current][i].transcript)
       }
       ;(recognition as any)._lastAlternatives = alternatives
+
+      // Fix 1 + Fix 5: Process the command immediately when the result is final,
+      // passing the live text directly (not via React state) to avoid the stale
+      // closure bug. This also eliminates the race condition where onend fires
+      // before onresult on Android Chrome, causing processCommand to run with
+      // an empty transcript from the isListening effect below.
+      if (event.results[current].isFinal) {
+        processedRef.current = true
+        void processCommand(result, alternatives)
+      }
     }
 
     recognition.onend = () => {
@@ -120,6 +135,15 @@ export function VoiceAssistant() {
     recognition.onerror = (event: any) => {
       console.error("Speech recognition error", event.error)
       setIsListening(false)
+
+      // Fix 4: If bn-BD isn't installed on this device/browser, silently switch to
+      // en-US so English commands still work (e.g. on desktop Chrome without Bangla).
+      if (event.error === 'language-not-supported' && !langFallbackRef.current) {
+        langFallbackRef.current = true
+        recognition.lang = 'en-US'
+        return // don't show an error — user will just try again with English
+      }
+
       if (event.error === 'not-allowed') {
         setResponse("মাইক্রোফোনের পারমিশন দেওয়া হয়নি। ব্রাউজার সেটিংসে মাইক্রোফোন অনুমতি দিন।")
       } else if (event.error === 'no-speech') {
@@ -129,6 +153,7 @@ export function VoiceAssistant() {
       }
     }
 
+
     recognitionRef.current = recognition
 
     return () => {
@@ -136,10 +161,15 @@ export function VoiceAssistant() {
     }
   }, [])
 
+  // Fix 1 (fallback): Some browsers never set isFinal=true. If onresult/isFinal
+  // never fired, process as a safety net when listening stops.
   useEffect(() => {
-    if (!isListening && transcript && isOpen) {
+    if (!isListening && transcript && isOpen && !processedRef.current) {
       const alternatives: string[] = recognitionRef.current?._lastAlternatives ?? [transcript]
       void processCommand(transcript, alternatives)
+    }
+    if (!isListening) {
+      processedRef.current = false
     }
   }, [isListening])
 
@@ -527,6 +557,7 @@ export function VoiceAssistant() {
     } else {
       setTranscript("")
       setResponse("")
+      processedRef.current = false
       setIsOpen(true)
       try {
         recognitionRef.current?.start()
@@ -547,7 +578,21 @@ export function VoiceAssistant() {
     stopKeepAlive()
   }
 
-  if (notSupported) return null
+  // Fix 2: Show a visible disabled button instead of returning null, so mama
+  // knows the feature exists but is unsupported on this browser, rather than
+  // the Mic FAB silently disappearing with no explanation.
+  if (notSupported) {
+    return (
+      <button
+        disabled
+        title="এই ব্রাউজারে ভয়েস সাপোর্ট নেই। Android Chrome বা Edge ব্যবহার করুন।"
+        aria-label="ভয়েস সাপোর্ট নেই"
+        className="fixed bottom-[4.5rem] right-4 md:right-8 md:bottom-8 h-16 w-16 bg-muted text-muted-foreground rounded-full shadow-md flex items-center justify-center opacity-40 cursor-not-allowed z-40"
+      >
+        <MicOff className="h-8 w-8" />
+      </button>
+    )
+  }
 
   return (
     <>
@@ -596,11 +641,14 @@ export function VoiceAssistant() {
         </div>
       )}
 
+      {/* Fix 3: bottom-[4.5rem] (72px) instead of bottom-20 (80px) to safely
+          clear the ~60px fixed bottom nav bar on small-screen phones. */}
       {!isOpen && (
         <button
           onClick={toggleListening}
+          aria-label="ভয়েস অ্যাসিস্ট্যান্ট খুলুন"
           className={cn(
-            "fixed bottom-20 right-4 md:right-8 md:bottom-8 h-16 w-16 bg-primary text-primary-foreground rounded-full shadow-lg flex items-center justify-center hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95 z-40"
+            "fixed bottom-[4.5rem] right-4 md:right-8 md:bottom-8 h-16 w-16 bg-primary text-primary-foreground rounded-full shadow-lg flex items-center justify-center hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95 z-40"
           )}
         >
           <Mic className="h-8 w-8" />

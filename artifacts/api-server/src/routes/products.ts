@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, ilike } from "drizzle-orm";
+import { and, eq, ilike, or } from "drizzle-orm";
 import { db, productsTable } from "@workspace/db";
 import {
   CreateProductBody,
@@ -42,7 +42,14 @@ router.get("/products", async (req, res): Promise<void> => {
 
   const conditions = [eq(productsTable.shopId, shopId)];
   if (search) {
-    conditions.push(ilike(productsTable.name, `%${search}%`));
+    // Search both name and barcode so typing/pasting a barcode in the billing
+    // search box finds the product even if barcode-lookup returned 404.
+    conditions.push(
+      or(
+        ilike(productsTable.name, `%${search}%`),
+        ilike(productsTable.barcode, `%${search}%`),
+      )!,
+    );
   }
 
   let rows = await db

@@ -94,10 +94,23 @@ export function Billing() {
       const product = await getProductByBarcode(code)
       if (product) {
         handleAddToCart(product)
-        toast({ title: `${product.name} যোগ করা হয়েছে` })
+        toast({ title: `✓ ${product.name} কার্টে যোগ হয়েছে` })
       }
-    } catch (e) {
-      toast({ title: "বারকোড মেলেনি বা ত্রুটি হয়েছে", variant: "destructive" })
+    } catch (e: any) {
+      // 404 = barcode not linked to any product yet.
+      // Prefill the search box with the scanned code so mama can still find
+      // the product by name, or know to add the barcode in Inventory first.
+      const is404 = e?.status === 404 || e?.message?.includes("404") || String(e).includes("404")
+      if (is404) {
+        setSearch(code)
+        toast({
+          title: "এই বারকোডের পণ্য পাওয়া যায়নি",
+          description: "ইনভেন্টরিতে পণ্যের বারকোড সেভ করুন, অথবা নিচ থেকে পণ্য সিলেক্ট করুন।",
+          variant: "destructive",
+        })
+      } else {
+        toast({ title: "স্ক্যান করতে সমস্যা হয়েছে", variant: "destructive" })
+      }
     }
   }
 
