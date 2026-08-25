@@ -11,7 +11,9 @@ import { shadcn } from '@clerk/themes';
 
 import { Layout } from '@/components/layout';
 import { ShopOnboardingGate } from '@/components/shop-onboarding-gate';
+import { ShopThemeProvider } from '@/context/shop-theme-context';
 import { Dashboard } from '@/pages/dashboard';
+import { SuperAdminDashboard } from '@/pages/dashboard/super-admin-dashboard';
 import { Billing } from '@/pages/billing';
 import { Inventory } from '@/pages/inventory';
 import { Customers } from '@/pages/customers';
@@ -143,6 +145,13 @@ function Router() {
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
 
+      {/* Platform Super Admin dashboard — accessed at /admin */}
+      <Route path="/admin">
+        <AuthedRoute>
+          <SuperAdminDashboard />
+        </AuthedRoute>
+      </Route>
+
       <Route path="/app/sales/:id">
         <AuthedRoute>
           <Receipt />
@@ -248,7 +257,9 @@ function ClerkProviderWithRoutes() {
       <QueryClientProvider client={queryClient}>
         <ClerkQueryClientCacheInvalidator />
         <ClerkAuthTokenWiring />
-        <Router />
+        <ShopThemeProvider>
+          <Router />
+        </ShopThemeProvider>
       </QueryClientProvider>
     </ClerkProvider>
   );

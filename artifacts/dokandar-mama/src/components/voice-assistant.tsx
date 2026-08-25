@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react"
-import { Mic, MicOff, X, Loader2 } from "lucide-react"
+import { Mic, MicOff, X, Loader2, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
+import { useShopTheme } from "@/context/shop-theme-context"
 import {
   useGetDashboardOverview,
   useListCustomers,
@@ -69,6 +70,7 @@ export function VoiceAssistant() {
   const langFallbackRef = useRef(false)
 
   const queryClient = useQueryClient()
+  const { category } = useShopTheme()
 
   // Fetch contextual data so we can answer questions without a round trip per query.
   const { data: dashboard } = useGetDashboardOverview()
@@ -642,7 +644,27 @@ export function VoiceAssistant() {
               </div>
             )}
             {!isListening && !transcript && !response && (
-              <p className="text-muted-foreground">{HELP_TEXT}</p>
+              <div className="space-y-3">
+                <p className="text-muted-foreground">{HELP_TEXT}</p>
+                
+                <div className="pt-2 border-t border-border/50">
+                  <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5" /> 
+                    {category.terminology.shopTypeLabel} এর জন্য প্রশ্ন:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {category.suggestedChotuQueries.map((q) => (
+                      <button
+                        key={q}
+                        onClick={() => void processCommand(q, [])}
+                        className="text-[11px] bg-primary/10 text-primary hover:bg-primary/20 px-2.5 py-1.5 rounded-full text-left transition-colors border border-primary/20"
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 

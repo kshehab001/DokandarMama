@@ -38,6 +38,13 @@ export const productsTable = pgTable("products", {
     .notNull()
     .default("5"),
   isPriceVariable: boolean("is_price_variable").notNull().default(false),
+  // Category-specific attributes
+  expiryDate: timestamp("expiry_date", { withTimezone: true }),
+  batchNumber: text("batch_number"),
+  brand: text("brand"),
+  warranty: text("warranty"),
+  size: text("size"),
+  color: text("color"),
   // Link to the global barcode catalogue when the item came from a scan.
   masterProductId: integer("master_product_id").references(
     () => masterProductsTable.id,
