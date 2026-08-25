@@ -204,7 +204,7 @@ router.post("/cashbox/close", async (req, res): Promise<void> => {
 
 /** Closed-session history for the reconciliation report. */
 router.get("/cashbox/sessions", async (req, res): Promise<void> => {
-  const { shopId } = requireShop(req);
+  const { shopId } = requireRole(req, "manager");
   const from = typeof req.query.from === "string" ? new Date(req.query.from) : null;
 
   const conditions = [eq(cashSessionsTable.shopId, shopId)];

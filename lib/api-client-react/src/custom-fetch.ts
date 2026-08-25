@@ -15,8 +15,11 @@ const DEFAULT_JSON_ACCEPT = "application/json, application/problem+json";
 // Module-level configuration
 // ---------------------------------------------------------------------------
 
+export type ShopIdGetter = () => Promise<number | string | null> | number | string | null;
+
 let _baseUrl: string | null = null;
 let _authTokenGetter: AuthTokenGetter | null = null;
+let _shopIdGetter: ShopIdGetter | null = null;
 
 /**
  * Set a base URL that is prepended to every relative request URL
@@ -30,18 +33,17 @@ export function setBaseUrl(url: string | null): void {
 }
 
 /**
- * Register a getter that supplies a bearer auth token.  Before every fetch
- * the getter is invoked; when it returns a non-null string, an
- * `Authorization: Bearer <token>` header is attached to the request.
- *
- * Useful for Expo bundles making token-gated API calls.
- * Pass `null` to clear the getter.
- *
- * NOTE: This function should never be used in web applications where session
- * token cookies are automatically associated with API calls by the browser.
+ * Register a getter that supplies a bearer auth token.
  */
 export function setAuthTokenGetter(getter: AuthTokenGetter | null): void {
   _authTokenGetter = getter;
+}
+
+/**
+ * Register a getter that supplies the active shop ID header (`x-shop-id`).
+ */
+export function setShopIdGetter(getter: ShopIdGetter | null): void {
+  _shopIdGetter = getter;
 }
 
 function isRequest(input: RequestInfo | URL): input is Request {
@@ -355,6 +357,19 @@ export async function customFetch<T = unknown>(
     const token = await _authTokenGetter();
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
+    }
+  }
+
+  // Attach active shop id header when configured or stored in localStorage
+  if (!headers.has("x-shop-id")) {
+    let shopId: number | string | null = null;
+    if (_shopIdGetter) {
+      shopId = await _shopIdGetter();
+    } else if (typeof window !== "undefined" && window.localStorage) {
+      shopId = window.localStorage.getItem("dokandar_active_shop_id");
+    }
+    if (shopId) {
+      headers.set("x-shop-id", String(shopId));
     }
   }
 

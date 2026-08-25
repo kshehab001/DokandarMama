@@ -12,6 +12,7 @@ import { shadcn } from '@clerk/themes';
 import { Layout } from '@/components/layout';
 import { ShopOnboardingGate } from '@/components/shop-onboarding-gate';
 import { ShopThemeProvider } from '@/context/shop-theme-context';
+import { RoleGuard } from '@/components/role-guard';
 import { Dashboard } from '@/pages/dashboard';
 import { SuperAdminDashboard } from '@/pages/dashboard/super-admin-dashboard';
 import { Billing } from '@/pages/billing';
@@ -148,7 +149,9 @@ function Router() {
       {/* Platform Super Admin dashboard — accessed at /admin */}
       <Route path="/admin">
         <AuthedRoute>
-          <SuperAdminDashboard />
+          <RoleGuard allowedRoles={["superadmin"]} fallbackTitle="সুপার অ্যাডমিন অ্যাক্সেস সংরক্ষিত">
+            <SuperAdminDashboard />
+          </RoleGuard>
         </AuthedRoute>
       </Route>
 
@@ -179,7 +182,9 @@ function Router() {
       </Route>
       <Route path="/app/reports">
         <AuthedRoute>
-          <Reports />
+          <RoleGuard minRole="manager" fallbackTitle="রিপোর্ট ও অ্যানালিটিক্স অ্যাক্সেস সংরক্ষিত">
+            <Reports />
+          </RoleGuard>
         </AuthedRoute>
       </Route>
       <Route path="/app">

@@ -160,12 +160,13 @@ router.delete("/customers/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  const { shopId } = requireRole(req, "manager");
   await db
     .delete(customersTable)
     .where(
       and(
         eq(customersTable.id, params.data.id),
-        eq(customersTable.shopId, requireShop(req).shopId),
+        eq(customersTable.shopId, shopId),
       ),
     );
   res.sendStatus(204);

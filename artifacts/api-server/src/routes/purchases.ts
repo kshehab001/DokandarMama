@@ -74,7 +74,7 @@ function serializeInvoice(
 
 /** Upload: store the OCR text, parse it into lines and match against stock. */
 router.post("/purchases", bigJson, async (req, res): Promise<void> => {
-  const ctx = requireRole(req, "shopkeeper");
+  const ctx = requireRole(req, "manager");
   const parsed = CreateInvoiceBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -149,7 +149,7 @@ router.post("/purchases", bigJson, async (req, res): Promise<void> => {
 });
 
 router.get("/purchases", async (req, res): Promise<void> => {
-  const { shopId } = requireShop(req);
+  const { shopId } = requireRole(req, "manager");
   const rows = await db
     .select()
     .from(purchaseInvoicesTable)
@@ -170,7 +170,7 @@ router.get("/purchases", async (req, res): Promise<void> => {
 });
 
 router.get("/purchases/:id", async (req, res): Promise<void> => {
-  const { shopId } = requireShop(req);
+  const { shopId } = requireRole(req, "manager");
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     res.status(400).json({ error: "Invalid invoice id" });
@@ -202,7 +202,7 @@ router.get("/purchases/:id", async (req, res): Promise<void> => {
  * product, skipped lines change nothing. All in one transaction.
  */
 router.post("/purchases/:id/confirm", async (req, res): Promise<void> => {
-  const ctx = requireRole(req, "shopkeeper");
+  const ctx = requireRole(req, "manager");
   const id = Number(req.params.id);
   if (!Number.isInteger(id)) {
     res.status(400).json({ error: "Invalid invoice id" });

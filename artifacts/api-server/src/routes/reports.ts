@@ -9,7 +9,7 @@ import {
 } from "@workspace/db";
 import { GetSalesSummaryQueryParams, GetTopProductsQueryParams } from "@workspace/api-zod";
 import { toNum } from "../lib/numeric";
-import { requireShop } from "../lib/tenant";
+import { requireRole, requireShop } from "../lib/tenant";
 
 const router: IRouter = Router();
 
@@ -66,7 +66,7 @@ router.get("/reports/summary", async (req, res): Promise<void> => {
     return;
   }
   const { range } = parsed.data;
-  const { shopId } = requireShop(req);
+  const { shopId } = requireRole(req, "manager");
   const start = rangeStart(range);
 
   const [sales, products] = await Promise.all([
@@ -84,7 +84,7 @@ router.get("/reports/summary", async (req, res): Promise<void> => {
           .select()
           .from(saleItemsTable)
           .where(inArray(saleItemsTable.saleId, saleIdsInRange))
-      : [];
+        : [];
   const costByProduct = new Map(
     products.map((p) => [p.id, p.costPrice === null ? null : toNum(p.costPrice)]),
   );
@@ -117,7 +117,7 @@ router.get("/reports/top-products", async (req, res): Promise<void> => {
     return;
   }
   const { range } = parsed.data;
-  const { shopId } = requireShop(req);
+  const { shopId } = requireRole(req, "manager");
   const start = rangeStart(range);
 
   const sales = await db
@@ -158,7 +158,7 @@ router.get("/reports/top-products", async (req, res): Promise<void> => {
 });
 
 router.get("/suggestions/restock", async (req, res): Promise<void> => {
-  const { shopId } = requireShop(req);
+  const { shopId } = requireRole(req, "manager");
   const thirtyDaysAgo = rangeStart("month");
 
   const [products, sales] = await Promise.all([

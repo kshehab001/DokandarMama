@@ -1,13 +1,14 @@
 import { useState } from "react"
 import { useListProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, getListProductsQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
+import { useShopTheme } from "@/context/shop-theme-context"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Edit, Trash2, AlertTriangle, PackagePlus, Loader2, Camera } from "lucide-react"
+import { Plus, Search, Edit, Trash2, AlertTriangle, PackagePlus, Loader2, Camera, Lock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ProductInput } from "@workspace/api-client-react"
 import { STARTER_CATALOG } from "@/lib/starter-catalog"
@@ -16,6 +17,9 @@ import { BarcodeScannerDialog } from "@/components/barcode-scanner-dialog"
 export function Inventory() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const { isShopkeeper } = useShopTheme()
+  const canManageProducts = !isShopkeeper
+
   const [search, setSearch] = useState("")
   const { data: products, isLoading } = useListProducts({ search: search || undefined })
 
@@ -43,6 +47,14 @@ export function Inventory() {
   const deleteProduct = useDeleteProduct()
 
   const handleOpenForm = (product?: any) => {
+    if (!canManageProducts) {
+      toast({
+        title: "অনুমতি নেই",
+        description: "পণ্য যোগ বা পরিবর্তনের জন্য ম্যানেজার বা মালিকের পারমিশন প্রয়োজন",
+        variant: "destructive",
+      })
+      return
+    }
     if (product) {
       setEditingId(product.id)
       setFormData({
@@ -96,6 +108,14 @@ export function Inventory() {
   }
 
   const handleDelete = (id: number, name: string) => {
+    if (!canManageProducts) {
+      toast({
+        title: "অনুমতি নেই",
+        description: "পণ্য ডিলিট করার জন্য ম্যানেজার বা মালিকের পারমিশন প্রয়োজন",
+        variant: "destructive",
+      })
+      return
+    }
     if (confirm(`আপনি কি নিশ্চিত যে ${name} মুছে ফেলতে চান?`)) {
       deleteProduct.mutate({ id }, {
         onSuccess: () => {
@@ -106,17 +126,12 @@ export function Inventory() {
     }
   }
 
-  
-
-  // Bulk-imports the starter catalog as this shopkeeper's own products via
-  // the normal create-product endpoint (so it's correctly scoped to them,
-  // same as adding products one by one). Skips names already in the shop's
-  // catalog so re-running the import is safe and doesn't create duplicates.
   const handleImportStarterCatalog = async () => {
+    if (!canManageProducts) return
     setIsImporting(true)
     setImportProgress(0)
-    const existingNames = new Set((products ?? []).map((p) => p.name))
-    const toImport = STARTER_CATALOG.filter((item) => !existingNames.has(item.name))
+    const existingNames = new Set((products ?? []).map((p) => p.name.trim().toLowerCase()))
+    const toImport = STARTER_CATALOG.filter((item) => !existingNames.has(item.name.trim().toLowerCase()))
 
     let successCount = 0
     let failCount = 0
@@ -164,18 +179,20 @@ export function Inventory() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-foreground">ইনভেন্টরি</h2>
-          <p className="text-muted-foreground">আপনার দোকানের সকল পণ্য</p>
+          <p className="text-muted-foreground">আপনার দোকানের সকল পণ্য ও স্টক তালিকা</p>
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={() => setIsImportOpen(true)} className="rounded-xl gap-2 flex-1 sm:flex-none">
-            <PackagePlus className="h-5 w-5" />
-            স্টার্টার ক্যাটালগ আমদানি
-          </Button>
-          <Button onClick={() => handleOpenForm()} className="rounded-xl gap-2 flex-1 sm:flex-none">
-            <Plus className="h-5 w-5" />
-            নতুন পণ্য যোগ করুন
-          </Button>
-        </div>
+        {canManageProducts && (
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button variant="outline" onClick={() => setIsImportOpen(true)} className="rounded-xl gap-2 flex-1 sm:flex-none">
+              <PackagePlus className="h-5 w-5" />
+              স্টার্টার ক্যাটালগ আমদানি
+            </Button>
+            <Button onClick={() => handleOpenForm()} className="rounded-xl gap-2 flex-1 sm:flex-none">
+              <Plus className="h-5 w-5" />
+              নতুন পণ্য যোগ করুন
+            </Button>
+          </div>
+        )}
       </div>
 
       <Card className="rounded-2xl">
@@ -198,7 +215,7 @@ export function Inventory() {
                   <th className="px-6 py-4 font-medium">পণ্যের নাম</th>
                   <th className="px-6 py-4 font-medium">বিক্রি মূল্য</th>
                   <th className="px-6 py-4 font-medium">স্টক</th>
-                  <th className="px-6 py-4 font-medium text-right">অ্যাকশন</th>
+                  <th className="px-6 py-4 font-medium text-right">{canManageProducts ? "অ্যাকশন" : "স্ট্যাটাস"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -231,12 +248,18 @@ export function Inventory() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right space-x-2">
-                        <Button variant="ghost" size="icon" className="h-10 w-10 text-primary hover:bg-primary/10" onClick={() => handleOpenForm(product)}>
-                          <Edit className="h-5 w-5" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(product.id, product.name)}>
-                          <Trash2 className="h-5 w-5" />
-                        </Button>
+                        {canManageProducts ? (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-10 w-10 text-primary hover:bg-primary/10" onClick={() => handleOpenForm(product)}>
+                              <Edit className="h-5 w-5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive hover:bg-destructive/10" onClick={() => handleDelete(product.id, product.name)}>
+                              <Trash2 className="h-5 w-5" />
+                            </Button>
+                          </>
+                        ) : (
+                          <Badge variant="outline" className="text-xs text-muted-foreground">উপলব্ধ</Badge>
+                        )}
                       </td>
                     </tr>
                   ))

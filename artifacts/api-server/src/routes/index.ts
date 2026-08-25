@@ -10,6 +10,7 @@ import masterProductsRouter from "./masterProducts";
 import cashboxRouter from "./cashbox";
 import purchasesRouter from "./purchases";
 import subscriptionsRouter from "./subscriptions";
+import adminRouter from "./admin";
 import { requireAuth } from "../lib/auth";
 import { withShopContext } from "../lib/tenant";
 
@@ -33,5 +34,6 @@ router.use(reportsRouter);
 router.use(cashboxRouter);
 router.use(purchasesRouter);
 router.use(subscriptionsRouter);
+router.use(adminRouter);
 
 export default router;

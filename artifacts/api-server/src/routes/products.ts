@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, eq, ilike, or } from "drizzle-orm";
-import { db, productsTable } from "@workspace/db";
+import { db, productsTable, type ShopRole } from "@workspace/db";
 import {
   CreateProductBody,
   DeleteProductParams,
@@ -15,7 +15,12 @@ import { requireRole, requireShop } from "../lib/tenant";
 
 const router: IRouter = Router();
 
-function serializeProduct(row: typeof productsTable.$inferSelect) {
+function serializeProduct(
+  row: typeof productsTable.$inferSelect,
+  role?: ShopRole | null,
+) {
+  // Redact wholesale cost price for shopkeepers / low-privileged roles
+  const hideCost = role === "shopkeeper";
   return {
     id: row.id,
     name: row.name,
@@ -23,7 +28,7 @@ function serializeProduct(row: typeof productsTable.$inferSelect) {
     category: row.category,
     unit: row.unit,
     price: toNum(row.price),
-    costPrice: row.costPrice === null ? null : toNum(row.costPrice),
+    costPrice: hideCost ? null : row.costPrice === null ? null : toNum(row.costPrice),
     stock: toNum(row.stock),
     lowStockThreshold: toNum(row.lowStockThreshold),
     isPriceVariable: row.isPriceVariable,
@@ -38,9 +43,9 @@ router.get("/products", async (req, res): Promise<void> => {
     return;
   }
   const { search, lowStockOnly } = parsed.data;
-  const { shopId } = requireShop(req);
+  const ctx = requireShop(req);
 
-  const conditions = [eq(productsTable.shopId, shopId)];
+  const conditions = [eq(productsTable.shopId, ctx.shopId)];
   if (search) {
     // Search both name and barcode so typing/pasting a barcode in the billing
     // search box finds the product even if barcode-lookup returned 404.
@@ -62,7 +67,7 @@ router.get("/products", async (req, res): Promise<void> => {
     rows = rows.filter((r) => toNum(r.stock) <= toNum(r.lowStockThreshold));
   }
 
-  res.json(rows.map(serializeProduct));
+  res.json(rows.map((r) => serializeProduct(r, ctx.role)));
 });
 
 router.post("/products", async (req, res): Promise<void> => {
@@ -71,7 +76,7 @@ router.post("/products", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const shopCtx = requireRole(req, "shopkeeper");
+  const shopCtx = requireRole(req, "manager");
   const { name, barcode, category, unit, price, costPrice, stock } =
     parsed.data;
 
@@ -95,7 +100,7 @@ router.post("/products", async (req, res): Promise<void> => {
     })
     .returning();
 
-  res.status(201).json(serializeProduct(row));
+  res.status(201).json(serializeProduct(row, shopCtx.role));
 });
 
 router.get("/products/barcode/:code", async (req, res): Promise<void> => {
@@ -105,13 +110,14 @@ router.get("/products/barcode/:code", async (req, res): Promise<void> => {
     return;
   }
 
+  const ctx = requireShop(req);
   const [row] = await db
     .select()
     .from(productsTable)
     .where(
       and(
         eq(productsTable.barcode, params.data.code),
-        eq(productsTable.shopId, requireShop(req).shopId),
+        eq(productsTable.shopId, ctx.shopId),
       ),
     );
 
@@ -120,7 +126,7 @@ router.get("/products/barcode/:code", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(serializeProduct(row));
+  res.json(serializeProduct(row, ctx.role));
 });
 
 router.get("/products/:id", async (req, res): Promise<void> => {
@@ -130,13 +136,14 @@ router.get("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  const ctx = requireShop(req);
   const [row] = await db
     .select()
     .from(productsTable)
     .where(
       and(
         eq(productsTable.id, params.data.id),
-        eq(productsTable.shopId, requireShop(req).shopId),
+        eq(productsTable.shopId, ctx.shopId),
       ),
     );
 
@@ -145,7 +152,7 @@ router.get("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(serializeProduct(row));
+  res.json(serializeProduct(row, ctx.role));
 });
 
 router.patch("/products/:id", async (req, res): Promise<void> => {
@@ -161,6 +168,7 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
+  const shopCtx = requireRole(req, "manager");
   const data = parsed.data;
   const updates: Partial<typeof productsTable.$inferInsert> = {};
   if (data.name !== undefined) updates.name = data.name;
@@ -181,7 +189,7 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
     .where(
       and(
         eq(productsTable.id, params.data.id),
-        eq(productsTable.shopId, requireRole(req, "shopkeeper").shopId),
+        eq(productsTable.shopId, shopCtx.shopId),
       ),
     )
     .returning();
@@ -191,7 +199,7 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
     return;
   }
 
-  res.json(serializeProduct(row));
+  res.json(serializeProduct(row, shopCtx.role));
 });
 
 router.delete("/products/:id", async (req, res): Promise<void> => {
