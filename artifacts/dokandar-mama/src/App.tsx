@@ -274,29 +274,29 @@ function ClerkProviderWithRoutes() {
       routerPush={(to) => setLocation(stripBase(to))}
       routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
     >
-      <QueryClientProvider client={queryClient}>
-        <ClerkQueryClientCacheInvalidator />
-        <ClerkAuthTokenWiring />
-        <ShopThemeProvider>
-          <LanguageProvider>
-            <ChouPresenceProvider>
-              <Router />
-            </ChouPresenceProvider>
-          </LanguageProvider>
-        </ShopThemeProvider>
-      </QueryClientProvider>
+      <ClerkQueryClientCacheInvalidator />
+      <ClerkAuthTokenWiring />
+      <ShopThemeProvider>
+        <LanguageProvider>
+          <ChouPresenceProvider>
+            <Router />
+          </ChouPresenceProvider>
+        </LanguageProvider>
+      </ShopThemeProvider>
     </ClerkProvider>
   );
 }
 
 function App() {
   return (
-    <TooltipProvider>
-      <WouterRouter base={basePath}>
-        <ClerkProviderWithRoutes />
-      </WouterRouter>
-      <Toaster />
-    </TooltipProvider>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <WouterRouter base={basePath}>
+          <ClerkProviderWithRoutes />
+        </WouterRouter>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
   );
 }
 
