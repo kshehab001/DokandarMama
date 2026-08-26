@@ -12,6 +12,7 @@ import { shadcn } from '@clerk/themes';
 import { Layout } from '@/components/layout';
 import { ShopOnboardingGate } from '@/components/shop-onboarding-gate';
 import { ShopThemeProvider } from '@/context/shop-theme-context';
+import { LanguageProvider } from '@/context/language-context';
 import { RoleGuard } from '@/components/role-guard';
 import { Dashboard } from '@/pages/dashboard';
 import { SuperAdminDashboard } from '@/pages/dashboard/super-admin-dashboard';
@@ -276,7 +277,9 @@ function ClerkProviderWithRoutes() {
         <ClerkQueryClientCacheInvalidator />
         <ClerkAuthTokenWiring />
         <ShopThemeProvider>
-          <Router />
+          <LanguageProvider>
+            <Router />
+          </LanguageProvider>
         </ShopThemeProvider>
       </QueryClientProvider>
     </ClerkProvider>

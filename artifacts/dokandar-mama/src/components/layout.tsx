@@ -17,11 +17,17 @@ import {
   ShieldAlert,
   Sparkles,
   Check,
+  WifiOff,
+  RefreshCw,
+  Globe,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { VoiceAssistant } from "./voice-assistant"
 import { useClerk, useUser } from "@clerk/react"
 import { useShopTheme } from "@/context/shop-theme-context"
+import { useLanguage } from "@/context/language-context"
+import { useOfflineSync } from "@/lib/offline-sync"
+import { ShopShutter } from "./shop-shutter"
 import { CATEGORY_LIST, type ShopCategoryId, type UserRole } from "@/lib/theme-config"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -73,47 +79,50 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false)
 
+  const { language, toggleLanguage, t } = useLanguage()
+  const { isOnline, isSyncing, pendingCount, runSync } = useOfflineSync()
+
   // Dynamically compute navigation items based on User Role & Category
   const navItems = (() => {
     if (isSuperAdmin) {
       return [
-        { href: "/admin", label: "প্ল্যাটফর্ম হোম", icon: ShieldAlert },
-        { href: "/app", label: "শপ ড্যাশবোর্ড", icon: Home },
-        { href: "/app/reports", label: "অ্যানালিটিক্স", icon: BarChart3 },
-        { href: "/app/customers", label: "ব্যবহারকারী", icon: Users },
-        { href: "/app/inventory", label: "ক্যাটাগরি", icon: Layers },
+        { href: "/admin", label: t("nav.dashboard", "প্ল্যাটফর্ম হোম"), icon: ShieldAlert },
+        { href: "/app", label: t("nav.dashboard", "শপ ড্যাশবোর্ড"), icon: Home },
+        { href: "/app/reports", label: t("nav.reports", "অ্যানালিটিক্স"), icon: BarChart3 },
+        { href: "/app/customers", label: t("nav.customers", "ব্যবহারকারী"), icon: Users },
+        { href: "/app/inventory", label: t("nav.inventory", "ক্যাটাগরি"), icon: Layers },
       ]
     }
 
     if (isShopkeeper) {
       return [
-        { href: "/app", label: "আজকের শিফট", icon: Home },
-        { href: "/app/billing", label: "দ্রুত বিক্রি", icon: ShoppingCart },
+        { href: "/app", label: t("nav.dashboard", "আজকের শিফট"), icon: Home },
+        { href: "/app/billing", label: t("nav.billing", "দ্রুত বিক্রি"), icon: ShoppingCart },
         { href: "/app/inventory", label: category.terminology.productLabel, icon: Package },
         { href: "/app/customers", label: category.terminology.bakiLabel, icon: Users },
-        { href: "/app/cashbox", label: "ক্যাশ ড্রয়ার", icon: Wallet },
+        { href: "/app/cashbox", label: t("nav.cashbox", "ক্যাশ ড্রয়ার"), icon: Wallet },
       ]
     }
 
     if (isManager) {
       return [
-        { href: "/app", label: "ড্যাশবোর্ড", icon: Home },
-        { href: "/app/billing", label: "বিলিং", icon: ShoppingCart },
+        { href: "/app", label: t("nav.dashboard", "ড্যাশবোর্ড"), icon: Home },
+        { href: "/app/billing", label: t("nav.billing", "বিলিং"), icon: ShoppingCart },
         { href: "/app/inventory", label: category.terminology.stockLabel, icon: Package },
         { href: "/app/customers", label: category.terminology.bakiLabel, icon: Users },
-        { href: "/app/cashbox", label: "ক্যাশ বক্স", icon: Wallet },
-        { href: "/app/reports", label: "রিপোর্ট", icon: BarChart3 },
+        { href: "/app/cashbox", label: t("nav.cashbox", "ক্যাশ বক্স"), icon: Wallet },
+        { href: "/app/reports", label: t("nav.reports", "রিপোর্ট"), icon: BarChart3 },
       ]
     }
 
     // Default: Owner
     return [
-      { href: "/app", label: "বিজনেস হোম", icon: Home },
-      { href: "/app/billing", label: "বিক্রি / POS", icon: ShoppingCart },
+      { href: "/app", label: t("nav.dashboard", "বিজনেস হোম"), icon: Home },
+      { href: "/app/billing", label: t("nav.billing", "বিক্রি / POS"), icon: ShoppingCart },
       { href: "/app/inventory", label: category.terminology.stockLabel, icon: Package },
       { href: "/app/customers", label: category.terminology.bakiLabel, icon: Users },
-      { href: "/app/cashbox", label: "ক্যাশ বক্স", icon: Wallet },
-      { href: "/app/reports", label: "আর্থিক খতিয়ান", icon: BarChart3 },
+      { href: "/app/cashbox", label: t("nav.cashbox", "ক্যাশ বক্স"), icon: Wallet },
+      { href: "/app/reports", label: t("nav.reports", "আর্থিক খতিয়ান"), icon: BarChart3 },
     ]
   })()
 
@@ -123,6 +132,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] flex flex-col md:flex-row bg-background">
+      {/* Daily Shop Opening Shutter Animation */}
+      <ShopShutter shopName={activeShop?.name || "দোকানদার মামা"} />
+
       {/* Mobile Header */}
       <header className="md:hidden flex items-center justify-between p-3.5 bg-card border-b border-card-border sticky top-0 z-20">
         <div className="flex items-center gap-2">
@@ -145,6 +157,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Language Toggle */}
+          <button
+            onClick={toggleLanguage}
+            className="h-8 px-2 rounded-xl border bg-muted/30 text-[11px] font-extrabold text-foreground hover:bg-muted/80 transition-colors flex items-center gap-1"
+            title="ভাষা পরিবর্তন (Language)"
+          >
+            <Globe className="w-3.5 h-3.5 text-primary" />
+            <span>{language === "bn" ? "বাং" : "EN"}</span>
+          </button>
+
           {/* Multi-Shop Branch Switcher for Owner */}
           {allShops.length > 1 && isOwner && (
             <DropdownMenu>
@@ -181,6 +203,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </header>
+
+      {/* Offline Status Warning Bar */}
+      {(!isOnline || pendingCount > 0) && (
+        <div className="bg-amber-500 text-zinc-950 px-4 py-1.5 text-xs font-bold flex items-center justify-between shadow-sm sticky top-14 md:top-0 z-30">
+          <div className="flex items-center gap-2">
+            {!isOnline ? <WifiOff className="w-4 h-4 shrink-0" /> : <RefreshCw className={cn("w-4 h-4 shrink-0", isSyncing && "animate-spin")} />}
+            <span>
+              {!isOnline
+                ? `অফলাইন মোড — নেট নেই। বিক্রয় ও হিসাব ফোনে সেভ হচ্ছে (${pendingCount} টি অপেক্ষমাণ)`
+                : `${pendingCount} টি অফলাইন ডাটা সার্ভারে সিঙ্ক হচ্ছে...`}
+            </span>
+          </div>
+          {isOnline && pendingCount > 0 && (
+            <button
+              onClick={runSync}
+              disabled={isSyncing}
+              className="bg-zinc-950 text-white px-2.5 py-0.5 rounded-lg text-[11px] font-bold"
+            >
+              {isSyncing ? "সিঙ্ক হচ্ছে..." : "এখনই সিঙ্ক করুন"}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Sidebar for Desktop */}
       <aside className={cn(

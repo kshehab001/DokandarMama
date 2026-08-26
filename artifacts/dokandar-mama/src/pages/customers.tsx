@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { queueOfflinePayment } from "@/lib/offline-sync"
 import { Plus, Search, UserPlus, Phone, FileText, ArrowDownLeft, ArrowUpRight } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { CustomerInput, LedgerEntry } from "@workspace/api-client-react"
@@ -77,13 +78,33 @@ export function Customers() {
     e.preventDefault()
     if (!selectedCustomer) return
     
+    const paymentPayload = { amount: Number(paymentAmount), note: "নগদ জমা" }
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      queueOfflinePayment(selectedCustomer.id, paymentPayload)
+      toast({
+        title: "অফলাইন জমা রেকর্ড হয়েছে!",
+        description: "ইন্টারনেট কানেকশন পেলে সার্ভারে স্বয়ংক্রিয়ভাবে সিঙ্ক হবে",
+      })
+      setIsPaymentOpen(false)
+      return
+    }
+
     recordPayment.mutate({ 
       id: selectedCustomer.id, 
-      data: { amount: Number(paymentAmount), note: "নগদ জমা" } 
+      data: paymentPayload 
     }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() })
         toast({ title: "জমা রেকর্ড করা হয়েছে" })
+        setIsPaymentOpen(false)
+      },
+      onError: () => {
+        queueOfflinePayment(selectedCustomer.id, paymentPayload)
+        toast({
+          title: "সার্ভারে পৌঁছানো যায়নি — অফলাইনে সেভ হয়েছে",
+          description: "পুনরায় সংযোগে সিঙ্ক হবে",
+        })
         setIsPaymentOpen(false)
       }
     })

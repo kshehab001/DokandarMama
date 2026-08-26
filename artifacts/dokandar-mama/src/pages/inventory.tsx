@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Edit, Trash2, AlertTriangle, PackagePlus, Loader2, Camera, Lock } from "lucide-react"
+import { Plus, Search, Edit, Trash2, AlertTriangle, PackagePlus, Loader2, Camera, Lock, FileText, Sparkles } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ProductInput } from "@workspace/api-client-react"
 import { getStarterCatalogForCategory } from "@/lib/starter-catalog"
 import { BarcodeScannerDialog } from "@/components/barcode-scanner-dialog"
+import { SellerBillDialog } from "@/components/seller-bill-dialog"
+import { lookupMasterBarcode } from "@/lib/master-barcode-catalog"
 
 export function Inventory() {
   const { toast } = useToast()
@@ -29,6 +31,8 @@ export function Inventory() {
   const [isImporting, setIsImporting] = useState(false)
   const [importProgress, setImportProgress] = useState(0)
   const [isScannerOpen, setIsScannerOpen] = useState(false)
+  const [isSellerBillOpen, setIsSellerBillOpen] = useState(false)
+  const [isMasterRecognized, setIsMasterRecognized] = useState(false)
   
   const [formData, setFormData] = useState<ProductInput>({
     name: "",
@@ -55,6 +59,7 @@ export function Inventory() {
       })
       return
     }
+    setIsMasterRecognized(false)
     if (product) {
       setEditingId(product.id)
       setFormData({
@@ -83,6 +88,29 @@ export function Inventory() {
       })
     }
     setIsFormOpen(true)
+  }
+
+  const handleBarcodeChange = async (barcode: string) => {
+    setFormData((prev) => ({ ...prev, barcode }))
+    if (barcode.trim().length >= 5 && !editingId) {
+      const master = await lookupMasterBarcode(barcode.trim())
+      if (master) {
+        setIsMasterRecognized(true)
+        setFormData((prev) => ({
+          ...prev,
+          barcode: master.barcode,
+          name: prev.name ? prev.name : (master.nameBn || master.name),
+          category: prev.category && prev.category !== "সাধারণ" ? prev.category : master.category,
+          unit: master.unit || prev.unit,
+          price: prev.price > 0 ? prev.price : master.defaultPrice,
+          costPrice: (prev.costPrice ?? 0) > 0 ? prev.costPrice : master.costPrice,
+        }))
+        toast({
+          title: "মাস্টার ক্যাটালগ থেকে পাওয়া গেছে!",
+          description: `${master.nameBn || master.name} (${master.brand})`,
+        })
+      }
+    }
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -183,14 +211,22 @@ export function Inventory() {
           <p className="text-muted-foreground">আপনার দোকানের সকল পণ্য ও স্টক তালিকা</p>
         </div>
         {canManageProducts && (
-          <div className="flex gap-2 w-full sm:w-auto">
-            <Button variant="outline" onClick={() => setIsImportOpen(true)} className="rounded-xl gap-2 flex-1 sm:flex-none">
-              <PackagePlus className="h-5 w-5" />
-              স্টার্টার ক্যাটালগ আমদানি
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              onClick={() => setIsSellerBillOpen(true)}
+              className="rounded-xl gap-2 flex-1 sm:flex-none border-primary/30 text-primary hover:bg-primary/10 font-bold"
+            >
+              <FileText className="h-4 w-4" />
+              বিল/মেমো স্ক্যান (OCR)
             </Button>
-            <Button onClick={() => handleOpenForm()} className="rounded-xl gap-2 flex-1 sm:flex-none">
-              <Plus className="h-5 w-5" />
-              নতুন পণ্য যোগ করুন
+            <Button variant="outline" onClick={() => setIsImportOpen(true)} className="rounded-xl gap-2 flex-1 sm:flex-none">
+              <PackagePlus className="h-4 w-4" />
+              স্টার্টার ক্যাটালগ
+            </Button>
+            <Button onClick={() => handleOpenForm()} className="rounded-xl gap-2 flex-1 sm:flex-none font-bold">
+              <Plus className="h-4 w-4" />
+              নতুন পণ্য যোগ
             </Button>
           </div>
         )}
@@ -294,9 +330,22 @@ export function Inventory() {
             </div>
 
             <div className="space-y-2">
-              <Label>বারকোড (ঐচ্ছিক)</Label>
+              <div className="flex items-center justify-between">
+                <Label>বারকোড (ঐচ্ছিক)</Label>
+                {isMasterRecognized && (
+                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-[10px] gap-1">
+                    <Sparkles className="h-2.5 w-2.5" />
+                    মাস্টার ক্যাটালগ রিকগনিশন
+                  </Badge>
+                )}
+              </div>
               <div className="flex gap-2">
-                <Input value={formData.barcode} onChange={e => setFormData({...formData, barcode: e.target.value})} className="h-12" />
+                <Input
+                  value={formData.barcode}
+                  onChange={(e) => handleBarcodeChange(e.target.value)}
+                  placeholder="বারকোড স্ক্যান বা টাইপ করুন"
+                  className="h-12 font-mono"
+                />
                 <Button type="button" size="icon" variant="outline" className="h-12 w-12 rounded-xl shrink-0" onClick={() => setIsScannerOpen(true)}>
                   <Camera className="h-5 w-5" />
                 </Button>
@@ -374,10 +423,15 @@ export function Inventory() {
         open={isScannerOpen}
         onOpenChange={setIsScannerOpen}
         onScan={(code) => {
-          setFormData((prev) => ({ ...prev, barcode: code }))
+          handleBarcodeChange(code)
           setIsScannerOpen(false)
-          toast({ title: "বারকোড স্ক্যান হয়েছে" })
         }}
+      />
+
+      <SellerBillDialog
+        open={isSellerBillOpen}
+        onOpenChange={setIsSellerBillOpen}
+        existingProducts={products || []}
       />
     </div>
   )

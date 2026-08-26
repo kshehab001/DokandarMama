@@ -15,6 +15,8 @@ import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { SaleItemInput, SaleInputPaymentMethod } from "@workspace/api-client-react"
 import { BarcodeScannerDialog } from "@/components/barcode-scanner-dialog"
+import { lookupMasterBarcode } from "@/lib/master-barcode-catalog"
+import { queueOfflineSale } from "@/lib/offline-sync"
 import { cn } from "@/lib/utils"
 
 type CartItem = {
@@ -472,6 +474,12 @@ export function Billing() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BarcodeScannerDialog
+        open={isScannerOpen}
+        onOpenChange={setIsScannerOpen}
+        onScan={handleBarcodeScanned}
+      />
     </div>
   )
 }
