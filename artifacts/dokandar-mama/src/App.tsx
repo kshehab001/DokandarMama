@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+﻿import { useEffect, useRef } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -29,7 +29,7 @@ import { SignUpPage } from '@/pages/sign-up';
 
 const queryClient = new QueryClient();
 
-// REQUIRED — copy verbatim. Resolves the key from window.location.hostname so the
+// REQUIRED â€” copy verbatim. Resolves the key from window.location.hostname so the
 // same build serves multiple Clerk custom domains. Do not inline the env var, leave
 // publishableKey undefined, or replace publishableKeyFromHost with anything else.
 const rawClerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -37,15 +37,15 @@ const clerkPubKey = (
   publishableKeyFromHost(window.location.hostname, rawClerkKey) || rawClerkKey
 );
 
-// REQUIRED — copy verbatim. Empty in dev (Clerk hits dev FAPI directly), auto-set
-// in prod. Do NOT gate on import.meta.env.PROD / NODE_ENV — the empty dev value
+// REQUIRED â€” copy verbatim. Empty in dev (Clerk hits dev FAPI directly), auto-set
+// in prod. Do NOT gate on import.meta.env.PROD / NODE_ENV â€” the empty dev value
 // is intentional, and any branching breaks the prod proxy.
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 // Clerk passes full paths to routerPush/routerReplace, but wouter's
-// setLocation prepends the base — strip it to avoid doubling.
+// setLocation prepends the base â€” strip it to avoid doubling.
 function stripBase(path: string): string {
   return basePath && path.startsWith(basePath)
     ? path.slice(basePath.length) || '/'
@@ -109,10 +109,10 @@ function LoadingScreen() {
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4 text-center">
       <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-3 animate-pulse">
-        <img src={`${basePath}/logo.svg`} alt="দোকানদার মামা" className="h-7 w-7" />
+        <img src={`${basePath}/logo.svg`} alt="à¦¦à§‹à¦•à¦¾à¦¨à¦¦à¦¾à¦° à¦®à¦¾à¦®à¦¾" className="h-7 w-7" />
       </div>
-      <div className="text-base font-bold text-foreground mb-1">দোকানদার মামা লোড হচ্ছে...</div>
-      <p className="text-xs text-muted-foreground">অনুগ্রহ করে অপেক্ষা করুন</p>
+      <div className="text-base font-bold text-foreground mb-1">à¦¦à§‹à¦•à¦¾à¦¨à¦¦à¦¾à¦° à¦®à¦¾à¦®à¦¾ à¦²à§‹à¦¡ à¦¹à¦šà§à¦›à§‡...</div>
+      <p className="text-xs text-muted-foreground">à¦…à¦¨à§à¦—à§à¦°à¦¹ à¦•à¦°à§‡ à¦…à¦ªà§‡à¦•à§à¦·à¦¾ à¦•à¦°à§à¦¨</p>
     </div>
   );
 }
@@ -157,14 +157,14 @@ function Router() {
     <Switch>
       <Route path="/" component={HomeRedirect} />
 
-      {/* REQUIRED — copy "/sign-in/*?" and "/sign-up/*?" verbatim. */}
+      {/* REQUIRED â€” copy "/sign-in/*?" and "/sign-up/*?" verbatim. */}
       <Route path="/sign-in/*?" component={SignInPage} />
       <Route path="/sign-up/*?" component={SignUpPage} />
 
-      {/* Platform Super Admin dashboard — accessed at /admin */}
+      {/* Platform Super Admin dashboard â€” accessed at /admin */}
       <Route path="/admin">
         <AuthedRoute>
-          <RoleGuard allowedRoles={["superadmin"]} fallbackTitle="সুপার অ্যাডমিন অ্যাক্সেস সংরক্ষিত">
+          <RoleGuard allowedRoles={["superadmin"]} fallbackTitle="à¦¸à§à¦ªà¦¾à¦° à¦…à§à¦¯à¦¾à¦¡à¦®à¦¿à¦¨ à¦…à§à¦¯à¦¾à¦•à§à¦¸à§‡à¦¸ à¦¸à¦‚à¦°à¦•à§à¦·à¦¿à¦¤">
             <SuperAdminDashboard />
           </RoleGuard>
         </AuthedRoute>
@@ -197,7 +197,7 @@ function Router() {
       </Route>
       <Route path="/app/reports">
         <AuthedRoute>
-          <RoleGuard minRole="manager" fallbackTitle="রিপোর্ট ও অ্যানালিটিক্স অ্যাক্সেস সংরক্ষিত">
+          <RoleGuard minRole="manager" fallbackTitle="à¦°à¦¿à¦ªà§‹à¦°à§à¦Ÿ à¦“ à¦…à§à¦¯à¦¾à¦¨à¦¾à¦²à¦¿à¦Ÿà¦¿à¦•à§à¦¸ à¦…à§à¦¯à¦¾à¦•à§à¦¸à§‡à¦¸ à¦¸à¦‚à¦°à¦•à§à¦·à¦¿à¦¤">
             <Reports />
           </RoleGuard>
         </AuthedRoute>
@@ -260,14 +260,14 @@ function ClerkProviderWithRoutes() {
       localization={{
         signIn: {
           start: {
-            title: 'স্বাগতম',
-            subtitle: 'আপনার দোকানের হিসাবে লগ ইন করুন',
+            title: 'à¦¸à§à¦¬à¦¾à¦—à¦¤à¦®',
+            subtitle: 'à¦†à¦ªà¦¨à¦¾à¦° à¦¦à§‹à¦•à¦¾à¦¨à§‡à¦° à¦¹à¦¿à¦¸à¦¾à¦¬à§‡ à¦²à¦— à¦‡à¦¨ à¦•à¦°à§à¦¨',
           },
         },
         signUp: {
           start: {
-            title: 'অ্যাকাউন্ট তৈরি করুন',
-            subtitle: 'আজই আপনার দোকানের হিসাব শুরু করুন',
+            title: 'à¦…à§à¦¯à¦¾à¦•à¦¾à¦‰à¦¨à§à¦Ÿ à¦¤à§ˆà¦°à¦¿ à¦•à¦°à§à¦¨',
+            subtitle: 'à¦†à¦œà¦‡ à¦†à¦ªà¦¨à¦¾à¦° à¦¦à§‹à¦•à¦¾à¦¨à§‡à¦° à¦¹à¦¿à¦¸à¦¾à¦¬ à¦¶à§à¦°à§ à¦•à¦°à§à¦¨',
           },
         },
       }}
