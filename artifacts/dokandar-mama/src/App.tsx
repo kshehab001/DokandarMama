@@ -13,6 +13,7 @@ import { Layout } from '@/components/layout';
 import { ShopOnboardingGate } from '@/components/shop-onboarding-gate';
 import { ShopThemeProvider } from '@/context/shop-theme-context';
 import { LanguageProvider } from '@/context/language-context';
+import { ChouPresenceProvider } from '@/context/chou-presence-context';
 import { RoleGuard } from '@/components/role-guard';
 import { Dashboard } from '@/pages/dashboard';
 import { SuperAdminDashboard } from '@/pages/dashboard/super-admin-dashboard';
@@ -278,7 +279,9 @@ function ClerkProviderWithRoutes() {
         <ClerkAuthTokenWiring />
         <ShopThemeProvider>
           <LanguageProvider>
-            <Router />
+            <ChouPresenceProvider>
+              <Router />
+            </ChouPresenceProvider>
           </LanguageProvider>
         </ShopThemeProvider>
       </QueryClientProvider>

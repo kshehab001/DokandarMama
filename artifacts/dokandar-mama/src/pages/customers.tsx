@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { 
   useListCustomers, 
   useCreateCustomer, 
@@ -19,6 +19,7 @@ import { Plus, Search, UserPlus, Phone, FileText, ArrowDownLeft, ArrowUpRight } 
 import { useToast } from "@/hooks/use-toast"
 import { CustomerInput, LedgerEntry } from "@workspace/api-client-react"
 import { format } from "date-fns"
+import { useChouPresence } from "@/context/chou-presence-context"
 
 export function Customers() {
   const { toast } = useToast()
@@ -35,6 +36,14 @@ export function Customers() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [formData, setFormData] = useState<CustomerInput>({ name: "", phone: "" })
   const createCustomer = useCreateCustomer()
+  const { setPose, milestone, speak } = useChouPresence()
+
+  // Listen for Chotu's quick-action "add_customer" event
+  useEffect(() => {
+    const handler = () => handleOpenForm()
+    window.addEventListener("chotu:action:add_customer", handler)
+    return () => window.removeEventListener("chotu:action:add_customer", handler)
+  }, [])
 
   // State for Payment Form
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
@@ -97,6 +106,8 @@ export function Customers() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() })
         toast({ title: "জমা রেকর্ড করা হয়েছে" })
+        setPose("baki", "happy")
+        milestone(`পাওনা আদায়! ৳${Number(paymentAmount).toLocaleString("bn-BD")} টাকা জমা হলো! 💰`)
         setIsPaymentOpen(false)
       },
       onError: () => {

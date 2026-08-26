@@ -144,18 +144,20 @@ export function VoiceAssistant() {
     queryClient.invalidateQueries({ queryKey: getGetCashboxStateQueryKey() })
   }
 
-  // Update Chotu visual state based on active events
   useEffect(() => {
-    if (isActing) {
-      setChotuState("thinking")
-    } else if (isListening) {
-      setChotuState("listening")
-    } else if (isSpeaking) {
-      setChotuState("speaking")
-    } else {
-      setChotuState("idle")
+    const handleToggleVoice = () => {
+      toggleListening()
     }
-  }, [isActing, isListening, isSpeaking])
+    const handleOpenPanel = () => {
+      setIsOpen(true)
+    }
+    window.addEventListener("chotu:toggle_voice", handleToggleVoice)
+    window.addEventListener("chotu:open_panel", handleOpenPanel)
+    return () => {
+      window.removeEventListener("chotu:toggle_voice", handleToggleVoice)
+      window.removeEventListener("chotu:open_panel", handleOpenPanel)
+    }
+  }, [notSupported, isListening])
 
   const triggerSuccessState = () => {
     setChotuState("success")

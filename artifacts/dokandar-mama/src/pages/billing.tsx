@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useLocation } from "wouter"
 import { 
   useListProducts, 
@@ -18,6 +18,7 @@ import { BarcodeScannerDialog } from "@/components/barcode-scanner-dialog"
 import { lookupMasterBarcode } from "@/lib/master-barcode-catalog"
 import { queueOfflineSale } from "@/lib/offline-sync"
 import { cn } from "@/lib/utils"
+import { useChouPresence } from "@/context/chou-presence-context"
 
 type CartItem = {
   product: any;
@@ -49,6 +50,25 @@ export function Billing() {
   const { data: products } = useListProducts({ search: search.length > 2 ? search : undefined })
   const { data: customers } = useListCustomers()
   const createSale = useCreateSale()
+  const { setPose, milestone, speak } = useChouPresence()
+
+  // Listen for Chotu's quick-action "scan" event from the floating widget
+  useEffect(() => {
+    const handler = () => setIsScannerOpen(true)
+    window.addEventListener("chotu:action:scan", handler)
+    return () => window.removeEventListener("chotu:action:scan", handler)
+  }, [])
+
+  // Listen for Chotu's quick-action "clear_cart" event
+  useEffect(() => {
+    const handler = () => {
+      setCart([])
+      setSearch("")
+      speak("নতুন বিল রেডি মামা! পণ্য সিলেক্ট করুন।", 2500)
+    }
+    window.addEventListener("chotu:action:clear_cart", handler)
+    return () => window.removeEventListener("chotu:action:clear_cart", handler)
+  }, [speak])
 
   // Derived
   const subtotal = cart.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0)
@@ -140,6 +160,11 @@ export function Billing() {
       onSuccess: (sale) => {
         toast({ title: "বিল সফলভাবে তৈরি হয়েছে!" })
         setIsCashDialogOpen(false)
+        // Chotu celebrates — pose holds for 4s before route changes
+        setPose("sale_done", "excited")
+        if (total >= 1000) {
+          milestone(`দারুণ! ৳${total.toLocaleString("bn-BD")} টাকার বিল হলো মামা! 🎉`)
+        }
         setLocation(`/app/sales/${sale.id}`)
       },
       onError: () => {

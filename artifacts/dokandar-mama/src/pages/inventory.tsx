@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useListProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, getListProductsQueryKey } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useShopTheme } from "@/context/shop-theme-context"
@@ -15,6 +15,7 @@ import { getStarterCatalogForCategory } from "@/lib/starter-catalog"
 import { BarcodeScannerDialog } from "@/components/barcode-scanner-dialog"
 import { SellerBillDialog } from "@/components/seller-bill-dialog"
 import { lookupMasterBarcode } from "@/lib/master-barcode-catalog"
+import { useChouPresence } from "@/context/chou-presence-context"
 
 export function Inventory() {
   const { toast } = useToast()
@@ -33,6 +34,19 @@ export function Inventory() {
   const [isScannerOpen, setIsScannerOpen] = useState(false)
   const [isSellerBillOpen, setIsSellerBillOpen] = useState(false)
   const [isMasterRecognized, setIsMasterRecognized] = useState(false)
+  const { setPose, speak } = useChouPresence()
+
+  // Listen for Chotu's quick-action events from the floating widget
+  useEffect(() => {
+    const handleAdd = () => handleOpenForm()
+    const handleScan = () => setIsScannerOpen(true)
+    window.addEventListener("chotu:action:add_product", handleAdd)
+    window.addEventListener("chotu:action:scan", handleScan)
+    return () => {
+      window.removeEventListener("chotu:action:add_product", handleAdd)
+      window.removeEventListener("chotu:action:scan", handleScan)
+    }
+  }, [canManageProducts])
   
   const [formData, setFormData] = useState<ProductInput>({
     name: "",
