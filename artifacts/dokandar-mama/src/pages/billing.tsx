@@ -10,8 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { Search, Plus, Minus, Trash2, Camera, UserPlus, Package, Banknote } from "lucide-react"
+import { Search, Plus, Minus, Trash2, Camera, Package, Banknote, ShoppingCart } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { SaleItemInput, SaleInputPaymentMethod } from "@workspace/api-client-react"
@@ -452,6 +451,3 @@ export function Billing() {
     </div>
   )
 }
-
-// Ensure ShoppingCart is imported
-import { ShoppingCart } from "lucide-react"
