@@ -96,6 +96,19 @@ app.use(express.urlencoded({ extended: true }));
 // never depend on Clerk's config being valid — the shell is what shows the
 // user a sign-in screen (or a clear error) in the first place. Only the
 // actual /api/* calls the loaded app makes need Clerk.
+// Helper to inject runtime Clerk configuration directly into index.html
+function getInjectedIndexHtml(indexHtmlPath: string): string {
+  try {
+    const rawHtml = fs.readFileSync(indexHtmlPath, "utf-8");
+    const pubKey = process.env.CLERK_PUBLISHABLE_KEY || process.env.VITE_CLERK_PUBLISHABLE_KEY || "";
+    const proxyUrl = process.env.VITE_CLERK_PROXY_URL || "";
+    const injectedScript = `<script>window.__CLERK_PUBLISHABLE_KEY__ = ${JSON.stringify(pubKey)}; window.__CLERK_PROXY_URL__ = ${JSON.stringify(proxyUrl)};</script>`;
+    return rawHtml.replace("</head>", `${injectedScript}</head>`);
+  } catch {
+    return "";
+  }
+}
+
 const staticDir = process.env.SERVE_STATIC_DIR;
 if (staticDir) {
   const resolvedDir = path.resolve(staticDir);
@@ -106,7 +119,14 @@ if (staticDir) {
       "SERVE_STATIC_DIR is set but index.html was not found there — static serving disabled",
     );
   } else {
-    app.use(express.static(resolvedDir));
+    // Serve static files (assets, images, scripts) without serving raw index.html for "/"
+    app.use(express.static(resolvedDir, { index: false }));
+
+    app.get("/", (_req, res) => {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      const html = getInjectedIndexHtml(indexHtmlPath);
+      res.send(html);
+    });
   }
 }
 
@@ -155,7 +175,9 @@ if (staticDir) {
   if (fs.existsSync(indexHtmlPath)) {
     app.use((req, res, next) => {
       if (req.method === "GET" && !req.path.startsWith("/api")) {
-        return res.sendFile(indexHtmlPath);
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        const html = getInjectedIndexHtml(indexHtmlPath);
+        return res.send(html);
       }
       next();
     });

@@ -29,13 +29,14 @@ import { SignUpPage } from '@/pages/sign-up';
 
 const queryClient = new QueryClient();
 
-// REQUIRED — copy verbatim. Resolves the key from window.location.hostname so the
-// same build serves multiple Clerk custom domains. Do not inline the env var, leave
-// publishableKey undefined, or replace publishableKeyFromHost with anything else.
-const rawClerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-const clerkPubKey = (
-  publishableKeyFromHost(window.location.hostname, rawClerkKey) || rawClerkKey
-);
+// Resolves key from build-time Vite env OR runtime window injection OR hostname
+const rawClerkKey =
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
+  (typeof window !== 'undefined' && (window as any).__CLERK_PUBLISHABLE_KEY__) ||
+  '';
+const clerkPubKey = rawClerkKey
+  ? (publishableKeyFromHost(window.location.hostname, rawClerkKey) || rawClerkKey)
+  : '';
 
 // REQUIRED — copy verbatim. Empty in dev (Clerk hits dev FAPI directly), auto-set
 // in prod. Do NOT gate on import.meta.env.PROD / NODE_ENV — the empty dev value
@@ -52,8 +53,28 @@ function stripBase(path: string): string {
     : path;
 }
 
-if (!clerkPubKey) {
-  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env file');
+function MissingClerkConfigScreen() {
+  return (
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-6 text-center">
+      <div className="max-w-md w-full bg-card border border-card-border rounded-2xl p-6 shadow-sm">
+        <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto mb-4 font-bold text-2xl">
+          ⚠️
+        </div>
+        <h2 className="text-lg font-bold text-foreground mb-2">Clerk Configuration Required</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          The application requires Clerk API keys to run. Please add the following environment variables in your Render Dashboard:
+        </p>
+        <div className="bg-muted p-3 rounded-lg text-left text-xs font-mono mb-4 space-y-1 text-foreground">
+          <div><strong>CLERK_PUBLISHABLE_KEY</strong>=pk_test_...</div>
+          <div><strong>CLERK_SECRET_KEY</strong>=sk_test_...</div>
+          <div><strong>VITE_CLERK_PUBLISHABLE_KEY</strong>=pk_test_...</div>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          After saving these variables in your Render Dashboard (Environment tab), trigger <strong>Clear build cache & deploy</strong>.
+        </p>
+      </div>
+    </div>
+  );
 }
 
 const clerkAppearance = {
@@ -288,6 +309,10 @@ function ClerkProviderWithRoutes() {
 }
 
 function App() {
+  if (!clerkPubKey) {
+    return <MissingClerkConfigScreen />;
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
