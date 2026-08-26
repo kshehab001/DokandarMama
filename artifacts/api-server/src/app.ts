@@ -146,15 +146,18 @@ app.use(
 );
 
 // SPA fallback: any route that isn't an API call and didn't match a real
-// static file (client-side routing paths like /app/billing) resolves to
+// static file (client-side routing paths like /app/billing, /sign-in) resolves to
 // index.html so React Router can take over. Mounted last, after /api, so
 // it never shadows a real API 404.
 if (staticDir) {
   const resolvedDir = path.resolve(staticDir);
   const indexHtmlPath = path.join(resolvedDir, "index.html");
   if (fs.existsSync(indexHtmlPath)) {
-    app.get(/^(?!\/api).*/, (_req, res) => {
-      res.sendFile(indexHtmlPath);
+    app.use((req, res, next) => {
+      if (req.method === "GET" && !req.path.startsWith("/api")) {
+        return res.sendFile(indexHtmlPath);
+      }
+      next();
     });
   }
 }
