@@ -3,12 +3,14 @@ import type { Sale } from "@workspace/api-client-react"
 import { useParams, useLocation } from "wouter"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Share2, ArrowLeft, Printer } from "lucide-react"
+import { Share2, ArrowLeft, Printer, CheckCircle2 } from "lucide-react"
 import { format } from "date-fns"
+import { useShopTheme } from "@/context/shop-theme-context"
 
 export function Receipt() {
   const params = useParams()
   const [, setLocation] = useLocation()
+  const { activeShop } = useShopTheme()
   
   const id = Number(params.id)
   const { data: sale, isLoading } = useGetSale<Sale>(id, {
@@ -17,25 +19,30 @@ export function Receipt() {
   })
 
   if (isLoading) {
-    return <div className="p-8 text-center">রসিদ লোড হচ্ছে...</div>
+    return <div className="p-8 text-center font-bold">রসিদ লোড হচ্ছে...</div>
   }
 
   if (!sale) {
-    return <div className="p-8 text-center text-destructive">রসিদ পাওয়া যায়নি</div>
+    return <div className="p-8 text-center text-destructive font-bold">রসিদ পাওয়া যায়নি</div>
+  }
+
+  const handlePrint = () => {
+    window.print()
   }
 
   const handleShare = async () => {
-    const text = `ক্যাশমেমো - দোকানদার মামা\n` +
-      `তারিখ: ${format(new Date(sale.createdAt), "dd/MM/yyyy")}\n` +
+    const shopName = activeShop?.name || "দোকানদার মামা"
+    const text = `ক্যাশমেমো — ${shopName}\n` +
+      `তারিখ: ${format(new Date(sale.createdAt), "dd/MM/yyyy hh:mm a")}\n` +
       `বিল নং: #${sale.id}\n` +
       (sale.customerName ? `কাস্টমার: ${sale.customerName}\n` : '') +
       `-----------------------\n` +
-      sale.items.map(item => `${item.productName} (${item.quantity} টি) - ৳${item.lineTotal}`).join('\n') +
+      sale.items.map(item => `${item.productName} (${item.quantity} টি) — ৳${item.lineTotal}`).join('\n') +
       `\n-----------------------\n` +
       `মোট বিল: ৳${sale.total}\n` +
-      `জমা: ৳${sale.paidAmount}\n` +
+      `পরিশোধ: ৳${sale.paidAmount}\n` +
       (sale.dueAmount > 0 ? `বাকি: ৳${sale.dueAmount}\n` : '') +
-      `ধন্যবাদ!`
+      `\nধন্যবাদ! আবার আসবেন।`
 
     if (navigator.share) {
       try {
@@ -44,98 +51,104 @@ export function Receipt() {
           text: text,
         })
       } catch (err) {
-        console.error("Share failed", err)
+        console.warn("Share aborted", err)
       }
     } else {
-      // Fallback to whatsapp link if Web Share API is not supported (e.g. desktop)
       const url = `https://wa.me/?text=${encodeURIComponent(text)}`
       window.open(url, "_blank")
     }
   }
 
   return (
-    <div className="max-w-md mx-auto space-y-6">
-      <Button variant="ghost" onClick={() => setLocation('/app/billing')} className="gap-2 -ml-4">
-        <ArrowLeft className="h-5 w-5" /> নতুন বিলে ফিরে যান
-      </Button>
+    <div className="max-w-md mx-auto space-y-6 print:m-0 print:p-0 print:max-w-full">
+      {/* Top action buttons (hidden in print) */}
+      <div className="flex items-center justify-between print:hidden">
+        <Button variant="ghost" onClick={() => setLocation('/app/billing')} className="gap-2 -ml-2 rounded-xl">
+          <ArrowLeft className="h-4 w-4" /> নতুন বিক্রি
+        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleShare} className="gap-1.5 rounded-xl font-bold">
+            <Share2 className="h-4 w-4 text-primary" /> শেয়ার
+          </Button>
+          <Button size="sm" onClick={handlePrint} className="gap-1.5 rounded-xl font-bold bg-primary text-white">
+            <Printer className="h-4 w-4" /> প্রিন্ট
+          </Button>
+        </div>
+      </div>
 
-      <Card className="rounded-none border-t-8 border-t-primary shadow-xl bg-white text-black p-8 font-mono relative overflow-hidden">
-        {/* Zig-zag bottom border effect using CSS */}
-        <div className="absolute bottom-0 left-0 right-0 h-4 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cG9seWdvbiBwb2ludHM9IjAsOCA0LDAgOCw4IiBmaWxsPSIjZjNmNGY2Ii8+Cjwvc3ZnPg==')] rotate-180"></div>
-        
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-bold mb-1">দোকানদার মামা</h1>
-          <p className="text-gray-500 text-sm">সাধারণ স্টোর</p>
-          <div className="mt-4 border-t border-b border-dashed border-gray-300 py-2 flex justify-between text-sm">
+      {/* Printable Receipt Card */}
+      <Card className="rounded-2xl border-t-8 border-t-primary shadow-xl bg-white text-zinc-900 p-6 sm:p-8 font-mono relative overflow-hidden print:border-none print:shadow-none print:p-0 print:m-0">
+        <div className="text-center mb-5">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <img src="/logo.png" alt="Dokandar Mama" className="h-8 w-auto object-contain" />
+          </div>
+          <h1 className="text-2xl font-black mb-0.5 tracking-tight">{activeShop?.name || "দোকানদার মামা"}</h1>
+          <p className="text-zinc-500 text-xs">{activeShop?.area || "ডিজিটাল রিটেইল ক্যাশমেমো"}</p>
+          
+          <div className="mt-3 border-t border-b border-dashed border-zinc-300 py-1.5 flex justify-between text-xs font-semibold">
             <div>বিল নং: <strong>#{sale.id}</strong></div>
             <div>{format(new Date(sale.createdAt), "dd/MM/yyyy hh:mm a")}</div>
           </div>
         </div>
 
         {sale.customerName && (
-          <div className="mb-4 text-sm">
-            <span className="text-gray-500">কাস্টমার:</span> <strong>{sale.customerName}</strong>
-            {sale.customerPhone && <div className="text-gray-500 text-xs">{sale.customerPhone}</div>}
+          <div className="mb-4 text-xs bg-zinc-50 p-2.5 rounded-xl border border-zinc-200 flex justify-between items-center">
+            <div>
+              <span className="text-zinc-500">কাস্টমার:</span> <strong>{sale.customerName}</strong>
+            </div>
+            {sale.customerPhone && <div className="text-zinc-600 font-bold">{sale.customerPhone}</div>}
           </div>
         )}
 
-        <div className="mb-6">
-          <table className="w-full text-sm">
+        <div className="mb-5">
+          <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-gray-300">
-                <th className="text-left py-2">বিবরণ</th>
-                <th className="text-right py-2">পরিমাণ</th>
-                <th className="text-right py-2">টাকা</th>
+              <tr className="border-b border-zinc-300 text-zinc-600">
+                <th className="text-left py-1.5 font-bold">পণ্য</th>
+                <th className="text-center py-1.5 font-bold">পরিমাণ</th>
+                <th className="text-right py-1.5 font-bold">টাকা</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-zinc-100">
               {sale.items.map((item, idx) => (
                 <tr key={idx}>
                   <td className="py-2 pr-2 leading-tight">
-                    <div className="font-semibold">{item.productName}</div>
-                    <div className="text-xs text-gray-500">@ ৳{item.unitPrice}</div>
+                    <div className="font-bold text-zinc-900">{item.productName}</div>
+                    <div className="text-[10px] text-zinc-500">@ ৳{item.unitPrice}</div>
                   </td>
-                  <td className="text-right py-2 align-top">{item.quantity}</td>
-                  <td className="text-right py-2 align-top font-medium">৳{item.lineTotal}</td>
+                  <td className="text-center py-2 align-top font-bold">{item.quantity}</td>
+                  <td className="text-right py-2 align-top font-bold text-zinc-900">৳{item.lineTotal}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        <div className="space-y-2 text-right">
-          <div className="flex justify-between items-center text-lg font-bold border-t border-gray-800 pt-2">
-            <span>মোট বিল:</span>
-            <span>৳ {sale.total}</span>
+        <div className="border-t border-dashed border-zinc-300 pt-3 space-y-1.5 text-xs">
+          <div className="flex justify-between font-medium">
+            <span className="text-zinc-600">মোট বিল:</span>
+            <span className="font-bold text-sm">৳{sale.total}</span>
           </div>
-          
-          {sale.paymentMethod !== 'cash' && (
-            <>
-              <div className="flex justify-between items-center text-gray-600">
-                <span>নগদ জমা:</span>
-                <span>৳ {sale.paidAmount}</span>
-              </div>
-              <div className="flex justify-between items-center text-lg font-bold text-red-600 border-t border-gray-300 pt-2">
-                <span>নতুন বাকি:</span>
-                <span>৳ {sale.dueAmount}</span>
-              </div>
-            </>
+          <div className="flex justify-between font-medium text-emerald-700">
+            <span>পরিশোধ ({sale.paymentMethod === 'cash' ? 'নগদ' : sale.paymentMethod === 'digital' ? 'ডিজিটাল' : 'বাকি'}):</span>
+            <span className="font-bold">৳{sale.paidAmount}</span>
+          </div>
+          {sale.dueAmount > 0 && (
+            <div className="flex justify-between font-bold text-red-600 text-sm pt-1 border-t border-zinc-200">
+              <span>বকেয়া (বাকি):</span>
+              <span>৳{sale.dueAmount}</span>
+            </div>
           )}
         </div>
 
-        <div className="text-center mt-8 text-sm text-gray-500">
-          <p>ধন্যবাদ! আবার আসবেন।</p>
+        <div className="text-center mt-6 pt-3 border-t border-dashed border-zinc-300 text-[11px] text-zinc-500">
+          <div className="flex items-center justify-center gap-1 font-bold text-zinc-700 mb-0.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+            <span>ধন্যবাদ! আবার আসবেন।</span>
+          </div>
+          <p className="text-[10px]">দোকানদার মামা ডিজিটাল খাতা দ্বারা তৈরি</p>
         </div>
       </Card>
-
-      <div className="flex gap-4">
-        <Button onClick={handleShare} className="flex-1 h-14 text-lg rounded-xl gap-2 font-bold bg-[#25D366] hover:bg-[#20bd5a] text-white">
-          <Share2 className="h-5 w-5" /> শেয়ার করুন
-        </Button>
-        <Button variant="outline" className="h-14 px-6 rounded-xl" onClick={() => window.print()}>
-          <Printer className="h-5 w-5" />
-        </Button>
-      </div>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 @layer theme, base, clerk, components, utilities;
-@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import '@clerk/themes/shadcn.css';
@@ -84,8 +84,33 @@
   --sidebar-foreground: 20 40% 15%;
   --sidebar-border: 20 20% 85%;
 
-  --app-font-sans: 'Hind Siliguri', sans-serif;
+  /* Bengali + Latin font stack — Noto Sans Bengali ensures accurate Bengali numerals */
+  --app-font-sans: 'Hind Siliguri', 'Noto Sans Bengali', 'Inter', sans-serif;
+  --app-font-number: 'Inter', 'Noto Sans Bengali', sans-serif;
   --radius: 0.75rem;
+}
+
+/* Bengali numeral clarity on billing/cashbox screens */
+.tabular-nums, .font-mono {
+  font-family: var(--app-font-number);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Print styles for thermal receipt */
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 4mm;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+    font-family: 'Hind Siliguri', 'Noto Sans Bengali', monospace !important;
+    font-size: 12px;
+  }
+  nav, header, footer, .print\:hidden {
+    display: none !important;
+  }
 }
 
 .dark {

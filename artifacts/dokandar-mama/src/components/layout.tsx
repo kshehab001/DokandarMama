@@ -28,6 +28,7 @@ import { useShopTheme } from "@/context/shop-theme-context"
 import { useLanguage } from "@/context/language-context"
 import { useOfflineSync } from "@/lib/offline-sync"
 import { ShopShutter } from "./shop-shutter"
+import { ShopkeeperOnboardingModal } from "./shopkeeper-onboarding-modal"
 import { CATEGORY_LIST, type ShopCategoryId, type UserRole } from "@/lib/theme-config"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -133,11 +134,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-[100dvh] flex flex-col md:flex-row bg-background">
       {/* Daily Shop Opening Shutter Animation */}
-      <ShopShutter shopName={activeShop?.name || "দোকানদার মামা"} />
+      <ShopShutter shopName={activeShop?.name || "দোকানদার মামা"} ownerName={user?.firstName ?? undefined} />
+
+      {/* First-run onboarding tutorial for new shopkeepers */}
+      <ShopkeeperOnboardingModal />
 
       {/* Mobile Header */}
       <header className="md:hidden flex items-center justify-between p-3.5 bg-card border-b border-card-border sticky top-0 z-20">
         <div className="flex items-center gap-2">
+          {/* Official Logo — always visible */}
+          <img src="/logo.png" alt="দোকানদার মামা" className="h-7 w-auto object-contain" />
+
           <button
             onClick={() => setIsCategoryModalOpen(true)}
             className="flex items-center gap-1.5 p-1.5 rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold text-xs"
@@ -236,10 +243,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
       )}>
         <div className="p-5 border-b space-y-3">
           <div className="flex items-center justify-between">
-            <h1 className="text-xl font-extrabold text-primary flex items-center gap-2">
-              <CategoryIcon className="w-6 h-6" />
-              দোকানদার মামা
-            </h1>
+            <div className="flex items-center gap-2">
+              <img
+                src="/logo.png"
+                alt="দোকানদার মামা"
+                className="h-9 w-auto object-contain"
+              />
+            </div>
           </div>
 
           {/* Shop Switcher & Category Badge */}
