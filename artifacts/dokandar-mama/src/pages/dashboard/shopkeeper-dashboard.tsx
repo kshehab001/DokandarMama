@@ -86,35 +86,89 @@ export function ShopkeeperDashboard() {
         </Badge>
       </div>
 
-      {/* Today's Quick Stats */}
+      {/* 4 Core Shopkeeper Metric Cards */}
       <div className="grid grid-cols-2 gap-3">
+        {/* 1. আজকের বিক্রি */}
         <Card className="rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 border-primary/20">
-          <CardContent className="p-4">
+          <CardContent className="p-3.5">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-semibold text-primary/80">আজকের বিক্রি</span>
               <TrendingUp className="h-4 w-4 text-primary" />
             </div>
-            <div className="text-3xl font-extrabold text-primary">
+            <div className="text-2xl sm:text-3xl font-extrabold text-primary">
               ৳{overview?.todaySalesTotal ?? 0}
             </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {overview?.todayTransactionCount ?? 0} টি বিল
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              {overview?.todayTransactionCount ?? 0} টি ক্যাশমেমো
             </div>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl bg-gradient-to-br from-amber-500/15 to-amber-500/5 border-amber-500/20">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-semibold text-amber-700">মোট বাকি</span>
-              <Users className="h-4 w-4 text-amber-600" />
-            </div>
-            <div className="text-3xl font-extrabold text-amber-700">
-              ৳{overview?.totalDue ?? 0}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">কাস্টমারদের পাওনা</div>
-          </CardContent>
-        </Card>
+        {/* 2. ক্যাশ বক্স */}
+        <Link href="/app/cashbox">
+          <Card className="rounded-2xl bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 border-emerald-500/20 hover:scale-[1.01] transition-transform cursor-pointer">
+            <CardContent className="p-3.5">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-emerald-700">ক্যাশ বক্স</span>
+                <Wallet className="h-4 w-4 text-emerald-600" />
+              </div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-emerald-700">
+                ৳{cashboxState?.expectedClosing ?? 0}
+              </div>
+              <div className="text-[11px] text-emerald-600/80 mt-0.5">
+                ড্রয়ারে নগদ
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* 3. মোট বাকি */}
+        <Link href="/app/customers">
+          <Card className="rounded-2xl bg-gradient-to-br from-amber-500/15 to-amber-500/5 border-amber-500/20 hover:scale-[1.01] transition-transform cursor-pointer">
+            <CardContent className="p-3.5">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-amber-700">মোট বাকি</span>
+                <Users className="h-4 w-4 text-amber-600" />
+              </div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-amber-700">
+                ৳{overview?.totalDue ?? 0}
+              </div>
+              <div className="text-[11px] text-amber-700/80 mt-0.5">পাওনা টাকা</div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* 4. কম স্টক */}
+        <Link href="/app/inventory">
+          <Card className={cn(
+            "rounded-2xl border transition-all cursor-pointer hover:scale-[1.01]",
+            (overview?.lowStockCount ?? 0) > 0
+              ? "bg-gradient-to-br from-rose-500/15 to-rose-500/5 border-rose-500/30"
+              : "bg-muted/30 border-border"
+          )}>
+            <CardContent className="p-3.5">
+              <div className="flex items-center justify-between mb-1">
+                <span className={cn(
+                  "text-xs font-semibold",
+                  (overview?.lowStockCount ?? 0) > 0 ? "text-rose-700" : "text-muted-foreground"
+                )}>কম স্টক</span>
+                <AlertTriangle className={cn(
+                  "h-4 w-4",
+                  (overview?.lowStockCount ?? 0) > 0 ? "text-rose-600" : "text-muted-foreground"
+                )} />
+              </div>
+              <div className={cn(
+                "text-2xl sm:text-3xl font-extrabold",
+                (overview?.lowStockCount ?? 0) > 0 ? "text-rose-700" : "text-foreground"
+              )}>
+                {overview?.lowStockCount ?? 0} টি
+              </div>
+              <div className="text-[11px] text-muted-foreground mt-0.5">
+                {(overview?.lowStockCount ?? 0) > 0 ? "পুনরায় কিনতে হবে" : "পর্যাপ্ত স্টক আছে"}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Big Action Buttons — the most important UI for Shopkeeper */}

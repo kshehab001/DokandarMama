@@ -18,6 +18,7 @@ export type ChotuIntentType =
   | "CHECK_SALES_SUMMARY"
   | "CHECK_CASHBOX"
   | "CHECK_RESTOCK"
+  | "CHECK_TOP_PRODUCTS"
   | "OPEN_PAGE"
   | "GENERAL_GREETING"
   | "UNKNOWN"
@@ -132,6 +133,23 @@ export function matchLocalIntent(rawText: string): ChotuParsedResult | null {
       intent: "CHECK_RESTOCK",
       confidence: "HIGH",
       parameters: {},
+    }
+  }
+
+  // 4b. TOP SELLING PRODUCTS ("বেশি বিক্রি", "top item", "beshi bikri")
+  if (
+    text.includes("বেশি বিক্রি") ||
+    text.includes("সবচেয়ে বেশি") ||
+    text.includes("সবচে বেশি") ||
+    text.includes("top selling") ||
+    text.includes("top product") ||
+    text.includes("beshi bikri") ||
+    text.includes("জনপ্রিয় পণ্য")
+  ) {
+    return {
+      intent: "CHECK_TOP_PRODUCTS",
+      confidence: "HIGH",
+      parameters: { timeframe: text.includes("মাস") ? "month" : "week" },
     }
   }
 

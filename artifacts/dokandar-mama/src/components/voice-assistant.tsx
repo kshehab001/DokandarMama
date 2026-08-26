@@ -428,6 +428,18 @@ export function VoiceAssistant() {
             break
           }
 
+          case "CHECK_TOP_PRODUCTS": {
+            if (topProducts && topProducts.length > 0) {
+              const topName = topProducts[0].productName
+              const topSold = topProducts[0].quantitySold
+              reply = `${getPersonalityGreeting()}সবচেয়ে বেশি বিক্রি হয়েছে ${topName} (${topSold} টি)।`
+            } else {
+              reply = `${getPersonalityGreeting()}এই মুহূর্তে টপ বিক্রির ডাটা পাওয়া যায়নি।`
+            }
+            success = true
+            break
+          }
+
           case "CHECK_STOCK": {
             const target = parsed.parameters.productName?.toLowerCase() || ""
             if (!target) {
@@ -438,7 +450,16 @@ export function VoiceAssistant() {
               (p) => p.name.toLowerCase().includes(target) || target.includes(p.name.toLowerCase())
             )
             if (matched) {
-              reply = `${getPersonalityGreeting()}${matched.name}-এর স্টক আছে ${matched.stock} ${matched.unit} (বিক্রি মূল্য ৳${matched.price})।`
+              const currentStock = Number(matched.stock)
+              const threshold = Number(matched.lowStockThreshold ?? 5)
+              let stockWarning = ""
+              if (currentStock <= threshold) {
+                stockWarning = " স্টক শেষের দিকে, দ্রুত কিনতে হবে।"
+              } else if (currentStock - threshold <= 3) {
+                const diff = currentStock - threshold
+                stockWarning = ` আর ${diff} ${matched.unit} বিক্রি হলেই স্টক কমে যাবে।`
+              }
+              reply = `${getPersonalityGreeting()}${matched.name} ${matched.stock} ${matched.unit} আছে।${stockWarning}`
               success = true
             } else {
               reply = `মামা, "${parsed.parameters.productName}" নামের কোনো পণ্য দোকানে পাওয়া যায়নি।`

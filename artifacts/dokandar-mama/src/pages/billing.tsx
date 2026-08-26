@@ -417,24 +417,48 @@ export function Billing() {
               <span className="text-muted-foreground">মোট বিল:</span>
               <span className="font-bold">৳ {total}</span>
             </div>
-            <div className="space-y-1">
-              <Label>দিলো (৳)</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">দিলো (৳)</Label>
               <Input
                 type="number"
                 autoFocus
-                className="h-14 text-2xl font-bold text-center rounded-xl"
+                className="h-14 text-3xl font-extrabold text-center rounded-2xl bg-muted/30 focus-visible:ring-primary"
                 value={cashReceivedStr}
                 onChange={(e) => setCashReceivedStr(e.target.value)}
               />
+              {/* Quick Cash Presets for Speed */}
+              <div className="grid grid-cols-4 gap-1.5 pt-1">
+                {[
+                  { label: `৳${total}`, value: total },
+                  { label: "৳১০০", value: 100 },
+                  { label: "৳৫০০", value: 500 },
+                  { label: "৳১০০০", value: 1000 },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => setCashReceivedStr(String(preset.value))}
+                    className="py-1.5 px-1 rounded-xl text-xs font-bold bg-muted/60 hover:bg-primary/15 hover:text-primary transition-colors border text-foreground"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
+
             <div
-              className={`rounded-xl p-4 text-center text-xl font-bold ${
-                changeDue >= 0 ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
+              className={`rounded-2xl p-4 text-center transition-all ${
+                changeDue >= 0
+                  ? "bg-emerald-500/15 text-emerald-700 border border-emerald-500/30"
+                  : "bg-destructive/15 text-destructive border border-destructive/30"
               }`}
             >
-              {changeDue >= 0
-                ? `ফেরত দিন: ৳ ${changeDue}`
-                : `আরও লাগবে: ৳ ${Math.abs(changeDue)}`}
+              <div className="text-xs font-medium opacity-80 uppercase tracking-wider mb-0.5">
+                {changeDue >= 0 ? "কাস্টমারকে ফেরত দিন" : "কাস্টমারের কাছে আরও পাবেন"}
+              </div>
+              <div className="text-3xl font-black">
+                ৳ {Math.abs(changeDue)}
+              </div>
             </div>
           </div>
           <DialogFooter>

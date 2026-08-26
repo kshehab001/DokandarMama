@@ -249,63 +249,91 @@ export function OwnerDashboard() {
         })}
       </div>
 
-      {/* Today's Financial Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="rounded-2xl bg-gradient-to-br from-primary/10 to-primary/5 border-primary/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-medium text-primary">আজকের বিক্রি</CardTitle>
-            <div className="bg-primary/20 p-2.5 rounded-full">
-              <BarChart3 className="h-5 w-5 text-primary" />
+      {/* 4 Core Financial & Operational Overview Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+        {/* 1. আজকের বিক্রি */}
+        <Card className="rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 border-primary/20">
+          <CardHeader className="flex flex-row items-center justify-between pb-1 p-4">
+            <CardTitle className="text-xs font-bold text-primary uppercase tracking-wider">আজকের বিক্রি</CardTitle>
+            <div className="bg-primary/20 p-2 rounded-xl text-primary">
+              <BarChart3 className="h-4 w-4" />
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-foreground">৳{overview?.todaySalesTotal || 0}</div>
-            <p className="text-sm text-muted-foreground mt-2 font-medium">
-              মোট {overview?.todayTransactionCount || 0} টি ক্যাশমেমো
+          <CardContent className="p-4 pt-0">
+            <div className="text-2xl sm:text-3xl font-extrabold text-foreground">৳{overview?.todaySalesTotal || 0}</div>
+            <p className="text-[11px] text-muted-foreground mt-1 font-medium">
+              {overview?.todayTransactionCount || 0} টি ক্যাশমেমো
             </p>
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl bg-gradient-to-br from-destructive/10 to-destructive/5 border-destructive/20">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-medium text-destructive">মোট বকেয়া (বাকি)</CardTitle>
-            <div className="bg-destructive/20 p-2.5 rounded-full">
-              <Receipt className="h-5 w-5 text-destructive" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-bold text-foreground">৳{overview?.totalDue || 0}</div>
-            <p className="text-sm text-muted-foreground mt-2 font-medium">আপনার পাওনা টাকা</p>
-          </CardContent>
-        </Card>
-      </div>
+        {/* 2. ক্যাশ ড্রয়ার */}
+        <Link href="/app/cashbox">
+          <Card className="rounded-2xl bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 border-emerald-500/20 hover:scale-[1.01] transition-transform cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between pb-1 p-4">
+              <CardTitle className="text-xs font-bold text-emerald-700 uppercase tracking-wider">ক্যাশ বক্স</CardTitle>
+              <div className="bg-emerald-500/20 p-2 rounded-xl text-emerald-700">
+                <Wallet className="h-4 w-4" />
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <div className="text-2xl sm:text-3xl font-extrabold text-emerald-700">৳{drawerExpected}</div>
+              <p className="text-[11px] text-emerald-700/80 mt-1 font-medium">
+                {isSessionOpen ? "শিফট চালু — ড্রয়ারে নগদ" : "শিফট বন্ধ"}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-      {/* Secondary stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="rounded-2xl">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-medium text-muted-foreground">মোট কাস্টমার</CardTitle>
-            <Users className="h-5 w-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-foreground">{overview?.customerCount || 0} জন</div>
-          </CardContent>
-        </Card>
+        {/* 3. মোট বকেয়া (বাকি) */}
+        <Link href="/app/customers">
+          <Card className="rounded-2xl bg-gradient-to-br from-amber-500/15 to-amber-500/5 border-amber-500/20 hover:scale-[1.01] transition-transform cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between pb-1 p-4">
+              <CardTitle className="text-xs font-bold text-amber-700 uppercase tracking-wider">মোট বকেয়া (বাকি)</CardTitle>
+              <div className="bg-amber-500/20 p-2 rounded-xl text-amber-700">
+                <Receipt className="h-4 w-4" />
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <div className="text-2xl sm:text-3xl font-extrabold text-amber-700">৳{overview?.totalDue || 0}</div>
+              <p className="text-[11px] text-amber-700/80 mt-1 font-medium">{overview?.customerCount || 0} জন কাস্টমার</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="rounded-2xl">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-lg font-medium text-muted-foreground">{category.terminology.stockLabel}</CardTitle>
-            <Package className={cn("h-5 w-5", (overview?.lowStockCount || 0) > 0 ? "text-amber-500" : "text-muted-foreground")} />
-          </CardHeader>
-          <CardContent>
-            <div className={cn("text-3xl font-bold", (overview?.lowStockCount || 0) > 0 ? "text-amber-600" : "text-foreground")}>
-              {overview?.lowStockCount || 0} টি পণ্য
-            </div>
-            {(overview?.lowStockCount || 0) > 0 && (
-              <p className="text-xs text-amber-600 mt-1">স্টক শেষের দিকে — আবার কিনুন</p>
-            )}
-          </CardContent>
-        </Card>
+        {/* 4. কম স্টক */}
+        <Link href="/app/inventory">
+          <Card className={cn(
+            "rounded-2xl border transition-all cursor-pointer hover:scale-[1.01]",
+            (overview?.lowStockCount || 0) > 0
+              ? "bg-gradient-to-br from-rose-500/15 to-rose-500/5 border-rose-500/30"
+              : "bg-muted/30 border-border"
+          )}>
+            <CardHeader className="flex flex-row items-center justify-between pb-1 p-4">
+              <CardTitle className={cn(
+                "text-xs font-bold uppercase tracking-wider",
+                (overview?.lowStockCount || 0) > 0 ? "text-rose-700" : "text-muted-foreground"
+              )}>{category.terminology.stockLabel}</CardTitle>
+              <div className={cn(
+                "p-2 rounded-xl",
+                (overview?.lowStockCount || 0) > 0 ? "bg-rose-500/20 text-rose-700" : "bg-muted text-muted-foreground"
+              )}>
+                <Package className="h-4 w-4" />
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <div className={cn(
+                "text-2xl sm:text-3xl font-extrabold",
+                (overview?.lowStockCount || 0) > 0 ? "text-rose-700" : "text-foreground"
+              )}>
+                {overview?.lowStockCount || 0} টি
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-1 font-medium">
+                {(overview?.lowStockCount || 0) > 0 ? "স্টক শেষের দিকে — কিনুন" : "পর্যাপ্ত স্টক আছে"}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Category-specific feature callout */}
