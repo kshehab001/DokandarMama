@@ -222,9 +222,23 @@ export function ShopShutter({
           </motion.div>
         </div>
 
-        {/* Bottom Tagline */}
-        <div className="w-full p-4 text-center text-[11px] text-zinc-500 font-semibold z-30">
-          দোকানদার মামা — স্মার্ট রিটেইল পার্টনার
+        {/* Bottom Tagline & Skip Button */}
+        <div className="w-full p-4 flex items-center justify-between z-30 max-w-lg mx-auto">
+          <span className="text-[11px] text-zinc-500 font-semibold">
+            দোকানদার মামা — স্মার্ট রিটেইল পার্টনার
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setIsVisible(false)
+              if (onComplete) onComplete()
+            }}
+            className="h-8 px-3 rounded-full text-xs font-bold border-zinc-700 bg-zinc-900 text-zinc-300 hover:text-white hover:bg-zinc-800"
+          >
+            দোকানে প্রবেশ করুন ➔
+          </Button>
         </div>
       </motion.div>
     </AnimatePresence>

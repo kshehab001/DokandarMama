@@ -50,7 +50,7 @@ export function ShopkeeperOnboardingModal() {
     },
   ]
 
-  const current = steps[step - 1]
+  const current = steps[step - 1] || steps[0]
   const Icon = current.icon
 
   return (
