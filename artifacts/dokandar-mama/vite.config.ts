@@ -1,11 +1,11 @@
-import path from 'path';
+﻿import path from 'path';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
 // Sensible standalone defaults: PORT/BASE_PATH used to be required env vars
-// (a Replit-specific wiring assumption). Any independent host — Docker,
-// Render, Railway, a VPS — can now just run `vite build`/`vite preview`
+// (a Replit-specific wiring assumption). Any independent host â€” Docker,
+// Render, Railway, a VPS â€” can now just run `vite build`/`vite preview`
 // without setting anything, while CI/deploy scripts can still override them.
 const port = Number(process.env.PORT ?? 5173);
 if (Number.isNaN(port) || port <= 0) {
@@ -54,7 +54,7 @@ export default defineConfig({
         'attached_assets',
       ),
     },
-    dedupe: ['react', 'react-dom'],
+    dedupe: ['react', 'react-dom', '@tanstack/react-query'],
   },
   root: path.resolve(import.meta.dirname),
   build: {
