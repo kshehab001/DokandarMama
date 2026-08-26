@@ -11,13 +11,13 @@ import { Badge } from "@/components/ui/badge"
 import { Plus, Search, Edit, Trash2, AlertTriangle, PackagePlus, Loader2, Camera, Lock } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ProductInput } from "@workspace/api-client-react"
-import { STARTER_CATALOG } from "@/lib/starter-catalog"
+import { getStarterCatalogForCategory } from "@/lib/starter-catalog"
 import { BarcodeScannerDialog } from "@/components/barcode-scanner-dialog"
 
 export function Inventory() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
-  const { isShopkeeper } = useShopTheme()
+  const { isShopkeeper, categoryId, category } = useShopTheme()
   const canManageProducts = !isShopkeeper
 
   const [search, setSearch] = useState("")
@@ -130,8 +130,9 @@ export function Inventory() {
     if (!canManageProducts) return
     setIsImporting(true)
     setImportProgress(0)
+    const categoryCatalog = getStarterCatalogForCategory(categoryId)
     const existingNames = new Set((products ?? []).map((p) => p.name.trim().toLowerCase()))
-    const toImport = STARTER_CATALOG.filter((item) => !existingNames.has(item.name.trim().toLowerCase()))
+    const toImport = categoryCatalog.filter((item) => !existingNames.has(item.name.trim().toLowerCase()))
 
     let successCount = 0
     let failCount = 0
@@ -349,12 +350,12 @@ export function Inventory() {
           </DialogHeader>
           <div className="py-2 space-y-3 text-sm text-muted-foreground">
             <p>
-              চাল, তেল, মসলা, নাস্তা, পানীয়, পরিচর্যা ও গৃহস্থালির {STARTER_CATALOG.length} টি সাধারণ পণ্য একসাথে আপনার ইনভেন্টরিতে যোগ করা হবে। দাম ও স্টক পরে এডিট করে নিজের মতো ঠিক করে নিতে পারবেন।
+              {category.displayNameBn} ক্যাটাগরির {getStarterCatalogForCategory(categoryId).length} টি সাধারণ পণ্য একসাথে আপনার ইনভেন্টরিতে যোগ করা হবে। দাম ও স্টক পরে এডিট করে নিজের মতো ঠিক করে নিতে পারবেন।
             </p>
             {isImporting && (
               <div className="flex items-center gap-2 text-foreground font-medium">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                যোগ করা হচ্ছে... ({importProgress}/{STARTER_CATALOG.length})
+                যোগ করা হচ্ছে... ({importProgress}/{getStarterCatalogForCategory(categoryId).length})
               </div>
             )}
           </div>

@@ -44,6 +44,10 @@ import {
   saveChotuConfig,
   DEFAULT_CHOTU_CONFIG,
 } from "@/lib/chotu-config"
+import {
+  interpretNaturalLanguageWithAI,
+  type ChotuParsedResult,
+} from "@/lib/chotu-ai-interpreter"
 import { ChotuAvatar } from "./chotu-avatar"
 import { ChotuCustomizerDialog } from "./chotu-customizer-dialog"
 import { BarcodeScannerDialog } from "./barcode-scanner-dialog"
@@ -124,6 +128,7 @@ export function VoiceAssistant() {
   const { data: weekSummary } = useGetSalesSummary({ range: "week" })
   const { data: topProducts } = useGetTopProducts({ range: "week" })
   const { data: restockSuggestions } = useGetRestockSuggestions()
+  const { data: cashbox } = useGetCashboxState()
   const { data: cashboxState } = useGetCashboxState()
 
   const createSale = useCreateSale()
@@ -193,7 +198,7 @@ export function VoiceAssistant() {
       }
       if (event.results[current].isFinal) {
         processedRef.current = true
-        void processCommand(result, alternatives)
+        void processCommand(result)
       }
     }
 
@@ -358,58 +363,159 @@ export function VoiceAssistant() {
     }
   }
 
-  // Command Processing Logic
-  const processCommand = async (rawText: string, alternatives: string[] = []) => {
+  // Command Processing Logic via Modular AI Interpretation Layer
+  const processCommand = async (rawText: string) => {
     setIsActing(true)
-    const candidates = [rawText, ...alternatives].map(normalize)
-    const has = (...needles: string[]) =>
-      candidates.some((c) => needles.some((n) => looseIncludes(c, normalize(n))))
+    setChotuState("thinking")
 
     let reply = ""
     let success = false
 
     try {
-      // 1. Dashboard Overview Queries
-      if (has("আজকের বিক্রি", "আজকে কত বিক্রি", "আজকের বেচাকেনা", "আজকে কত টাকা বেচা")) {
-        const total = dashboard?.todaySalesTotal ?? 0
-        const count = dashboard?.todayTransactionCount ?? 0
-        reply = `${getPersonalityGreeting()}আজকে মোট ${count} টি বিক্রয়ে ৳${total} টাকা বিক্রি হয়েছে।`
-        success = true
-      } else if (has("মোট বাকি", "দোকানের মোট বাকি", "সব বাকি কত", "কাস্টমারের বাকি")) {
-        const totalDue = dashboard?.totalDue ?? 0
-        reply = `${getPersonalityGreeting()}দোকানের বর্তমান মোট বাকি ৳${totalDue} টাকা।`
-        success = true
-      } else if (has("স্টকে কম", "কম স্টক", "কোন পণ্য কম", "কি কি শেষ")) {
-        const lowCount = dashboard?.lowStockCount ?? 0
-        reply = `${getPersonalityGreeting()}বর্তমানে ${lowCount} টি পণ্যের স্টক কম রয়েছে।`
-        success = true
-      } else if (has("কাস্টমার কতজন", "মোট কাস্টমার", "কাস্টমার সংখ্যা")) {
-        const custCount = dashboard?.customerCount ?? 0
-        reply = `${getPersonalityGreeting()}দোকানে মোট ${custCount} জন কাস্টমার নিবন্ধিত আছে।`
-        success = true
-      } else if (has("টাকা জমা", "নগদ দিলো", "বাকি দিলো", "পরিশোধ করলো")) {
-        // e.g. "রহিম ৫০০ টাকা দিলো"
-        const numMatch = candidates[0].match(/(\d+)/)
-        const amount = numMatch ? Number(numMatch[1]) : null
-        if (amount && customers && customers.length > 0) {
-          const matchedCust = customers.find((c) => candidates[0].includes(c.name.toLowerCase()))
-          if (matchedCust) {
-            await recordPayment.mutateAsync({
-              id: matchedCust.id,
-              data: { amount, note: "ছোটু ভয়েস এন্ট্রি" },
-            })
-            invalidateShopData()
-            reply = `${getPersonalityGreeting()}${matchedCust.name}-এর ৳${amount} টাকা জমা নেওয়া হয়েছে।`
+      // 1. Pass to Modular AI Interpreter (Tier 1 Fast Matcher -> Tier 2 AI -> Tier 3 Heuristic)
+      const parsed: ChotuParsedResult = await interpretNaturalLanguageWithAI(
+        rawText,
+        {
+          availableProducts: products?.map((p) => p.name) || [],
+          availableCustomers: customers?.map((c) => c.name) || [],
+        },
+        import.meta.env.VITE_GEMINI_API_KEY
+      )
+
+      // 2. Handle Low Confidence (Politely ask user to rephrase)
+      if (parsed.confidence === "LOW") {
+        reply = parsed.clarificationQuestion || "মামা, কথাটা বুঝতে পারিনি। অনুগ্রহ করে আরেকটু স্পষ্ট করে বলুন।"
+        triggerErrorState()
+      }
+      // 3. Handle Medium Confidence (Ask specific clarification question)
+      else if (parsed.confidence === "MEDIUM") {
+        reply = parsed.clarificationQuestion || "মামা, একটু নির্দিষ্ট করে বলুন কী দেখতে চান।"
+      }
+      // 4. Handle High Confidence - Dispatch to Fixed Predefined Dokandar Mama Command
+      else {
+        switch (parsed.intent) {
+          case "GENERAL_GREETING": {
+            reply = `${getPersonalityGreeting()}আমি আপনার সাথে আছি। আজকের বিক্রি, স্টক, বাকি বা ক্যাশ বক্স সম্পর্কে জিজ্ঞেস করতে পারেন।`
             success = true
-          } else {
-            reply = "মামা, কাস্টমারের নাম বুঝতে পারিনি। অনুগ্রহ করে নাম ও পরিমাণ পরিষ্কার করে বলুন।"
+            break
           }
-        } else {
-          reply = "মামা, কাস্টমারের নাম এবং কত টাকা দিলো তা স্পষ্ট করে বলুন।"
+
+          case "CHECK_SALES_SUMMARY": {
+            const total = dashboard?.todaySalesTotal ?? 0
+            const count = dashboard?.todayTransactionCount ?? 0
+            reply = `${getPersonalityGreeting()}আজকে মোট ${count} টি বিক্রয়ে ৳${total} টাকা বিক্রি হয়েছে।`
+            success = true
+            break
+          }
+
+          case "CHECK_CASHBOX": {
+            const balance = cashbox?.expectedClosing ?? cashbox?.session?.openingBalance ?? 0
+            reply = `${getPersonalityGreeting()}ক্যাশ ড্রয়ারে বর্তমানে ৳${balance} টাকা হিসাব আছে।`
+            success = true
+            break
+          }
+
+          case "CHECK_RESTOCK": {
+            const lowCount = dashboard?.lowStockCount ?? 0
+            const lowItems = products?.filter((p) => p.stock <= p.lowStockThreshold) || []
+            if (lowItems.length > 0) {
+              const names = lowItems.slice(0, 3).map((p) => p.name).join(", ")
+              reply = `${getPersonalityGreeting()}${lowCount} টি পণ্যের স্টক কম: ${names}${lowItems.length > 3 ? " ইত্যাদি" : ""}।`
+            } else {
+              reply = `${getPersonalityGreeting()}সব পণ্যের পর্যাপ্ত স্টক আছে, কোনো ঘাটতি নেই।`
+            }
+            success = true
+            break
+          }
+
+          case "CHECK_STOCK": {
+            const target = parsed.parameters.productName?.toLowerCase() || ""
+            if (!target) {
+              reply = "মামা, কোন পণ্যের স্টক জানতে চান?"
+              break
+            }
+            const matched = products?.find(
+              (p) => p.name.toLowerCase().includes(target) || target.includes(p.name.toLowerCase())
+            )
+            if (matched) {
+              reply = `${getPersonalityGreeting()}${matched.name}-এর স্টক আছে ${matched.stock} ${matched.unit} (বিক্রি মূল্য ৳${matched.price})।`
+              success = true
+            } else {
+              reply = `মামা, "${parsed.parameters.productName}" নামের কোনো পণ্য দোকানে পাওয়া যায়নি।`
+            }
+            break
+          }
+
+          case "CHECK_DUE": {
+            const target = parsed.parameters.customerName?.toLowerCase() || ""
+            if (!target) {
+              const totalDue = dashboard?.totalDue ?? 0
+              reply = `${getPersonalityGreeting()}দোকানের মোট বকেয়া বাকি ৳${totalDue} টাকা।`
+              success = true
+              break
+            }
+            const matched = customers?.find(
+              (c) => c.name.toLowerCase().includes(target) || target.includes(c.name.toLowerCase())
+            )
+            if (matched) {
+              reply = `${getPersonalityGreeting()}${matched.name}-এর বাকি আছে ৳${matched.bakiBalance} টাকা।`
+              success = true
+            } else {
+              reply = `মামা, "${parsed.parameters.customerName}" নামের কোনো কাস্টমার তালিকায় নেই।`
+            }
+            break
+          }
+
+          case "RECORD_PAYMENT": {
+            const target = parsed.parameters.customerName?.toLowerCase() || ""
+            const amount = parsed.parameters.amount || 0
+            if (amount > 0 && customers && customers.length > 0) {
+              const matched = customers.find(
+                (c) => c.name.toLowerCase().includes(target) || target.includes(c.name.toLowerCase())
+              )
+              if (matched) {
+                await recordPayment.mutateAsync({
+                  id: matched.id,
+                  data: { amount, note: "ছোটু ভয়েস এন্ট্রি" },
+                })
+                invalidateShopData()
+                reply = `${getPersonalityGreeting()}${matched.name}-এর ৳${amount} টাকা জমা নেওয়া হয়েছে।`
+                success = true
+              } else {
+                reply = `মামা, "${parsed.parameters.customerName}" নামের কাস্টমার পাওয়া যায়নি।`
+              }
+            } else {
+              reply = "মামা, কাস্টমারের নাম এবং টাকার পরিমাণ পরিষ্কার করে বলুন।"
+            }
+            break
+          }
+
+          case "OPEN_PAGE": {
+            const page = parsed.parameters.targetPage
+            if (page === "billing") {
+              setLocation("/app/billing")
+              reply = `${getPersonalityGreeting()}বিলিং পেজ ওপেন করেছি।`
+            } else if (page === "inventory") {
+              setLocation("/app/inventory")
+              reply = `${getPersonalityGreeting()}ইনভেন্টরি পেজ ওপেন করেছি।`
+            } else if (page === "customers") {
+              setLocation("/app/customers")
+              reply = `${getPersonalityGreeting()}কাস্টমার তালিকা ওপেন করেছি।`
+            } else if (page === "reports") {
+              setLocation("/app/reports")
+              reply = `${getPersonalityGreeting()}রিপোর্ট পেজ ওপেন করেছি।`
+            } else {
+              reply = `${getPersonalityGreeting()}পেজ ওপেন করা হয়েছে।`
+            }
+            success = true
+            break
+          }
+
+          default: {
+            reply = `${getPersonalityGreeting()}আমি আপনার কথা শুনেছি ("${rawText}")। আজকের বিক্রি, মোট বাকি বা স্টক সম্পর্কে জানতে পারেন।`
+            success = true
+          }
         }
-      } else {
-        reply = `${getPersonalityGreeting()}আমি আপনার কথা শুনেছি ("${rawText}")। আজকের বিক্রি, মোট বাকি বা স্টক সম্পর্কে জানতে পারেন।`
-        success = true
       }
     } catch (e) {
       console.error("Command execution error", e)
@@ -601,7 +707,7 @@ export function VoiceAssistant() {
                     {category.suggestedChotuQueries.slice(0, 3).map((q) => (
                       <button
                         key={q}
-                        onClick={() => void processCommand(q, [])}
+                        onClick={() => void processCommand(q)}
                         className="text-[10px] bg-primary/10 text-primary hover:bg-primary/20 px-2 py-1 rounded-full text-left transition-colors border border-primary/20"
                       >
                         {q}

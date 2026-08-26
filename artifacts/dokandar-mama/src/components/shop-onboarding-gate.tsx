@@ -23,12 +23,33 @@ export function ShopOnboardingGate({ children }: { children: React.ReactNode }) 
   const [selectedCategory, setSelectedCategory] = useState<ShopCategoryId>("mudi")
   const [saving, setSaving] = useState(false)
 
-  if (!isLoaded || !user) return null
+  if (!isLoaded || !user) {
+    return (
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-3 animate-pulse text-primary font-bold">
+          দ
+        </div>
+        <div className="text-sm font-bold text-foreground">ব্যবহারকারী লোড হচ্ছে...</div>
+      </div>
+    )
+  }
 
   const metadata = user.unsafeMetadata as { displayName?: string; shopName?: string; shopCategory?: string } | undefined
+
+  if (isShopLoading && !metadata?.shopName) {
+    return (
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-3 animate-pulse text-primary font-bold">
+          দ
+        </div>
+        <div className="text-sm font-bold text-foreground">দোকানের তথ্য যাচাই করা হচ্ছে...</div>
+      </div>
+    )
+  }
+
   const needsOnboarding = !metadata?.shopName && (!currentShop || !currentShop.shop)
 
-  if (!needsOnboarding && !isShopLoading) return <>{children}</>
+  if (!needsOnboarding) return <>{children}</>
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

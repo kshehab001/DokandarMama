@@ -103,37 +103,50 @@ const clerkAppearance = {
   },
 };
 
-function HomeRedirect() {
+function LoadingScreen() {
   return (
-    <>
-      <Show when="signed-in">
-        <Redirect to="/app" />
-      </Show>
-      <Show when="signed-out">
-        <Landing />
-      </Show>
-    </>
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4 text-center">
+      <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-3 animate-pulse">
+        <img src={`${basePath}/logo.svg`} alt="দোকানদার মামা" className="h-7 w-7" />
+      </div>
+      <div className="text-base font-bold text-foreground mb-1">দোকানদার মামা লোড হচ্ছে...</div>
+      <p className="text-xs text-muted-foreground">অনুগ্রহ করে অপেক্ষা করুন</p>
+    </div>
   );
+}
+
+function HomeRedirect() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return <LoadingScreen />;
+  }
+
+  if (isSignedIn) {
+    return <Redirect to="/app" />;
+  }
+
+  return <Landing />;
 }
 
 // Every authenticated screen goes through here, which is what guarantees
 // the Layout's home/billing nav (bottom bar on mobile, sidebar on desktop)
-// is present on every page — previously only "/app" was wrapped in Layout,
-// so Billing/Inventory/Customers/Reports/Receipt rendered with no nav at
-// all and back-button was the only way around.
+// is present on every page.
 function AuthedRoute({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <Show when="signed-in">
-        <ShopOnboardingGate>
-          <Layout>{children}</Layout>
-        </ShopOnboardingGate>
-      </Show>
+  const { isLoaded, isSignedIn } = useAuth();
 
-      <Show when="signed-out">
-        <Redirect to="/" />
-      </Show>
-    </>
+  if (!isLoaded) {
+    return <LoadingScreen />;
+  }
+
+  if (!isSignedIn) {
+    return <Redirect to="/" />;
+  }
+
+  return (
+    <ShopOnboardingGate>
+      <Layout>{children}</Layout>
+    </ShopOnboardingGate>
   );
 }
 
