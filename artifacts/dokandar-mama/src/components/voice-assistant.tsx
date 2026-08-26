@@ -1,9 +1,23 @@
 import { useState, useEffect, useRef } from "react"
-import { Mic, MicOff, X, Loader2, Sparkles } from "lucide-react"
+import {
+  Mic,
+  MicOff,
+  X,
+  Loader2,
+  Sparkles,
+  Camera,
+  PlusCircle,
+  Receipt,
+  Package,
+  Wand2,
+  Volume2,
+  VolumeX,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
 import { useShopTheme } from "@/context/shop-theme-context"
+import { useLocation } from "wouter"
 import {
   useGetDashboardOverview,
   useListCustomers,
@@ -21,7 +35,19 @@ import {
   getGetTopProductsQueryKey,
   getGetRestockSuggestionsQueryKey,
   getGetCashboxStateQueryKey,
+  getProductByBarcode,
 } from "@workspace/api-client-react"
+import {
+  type ChotuConfig,
+  type ChotuState,
+  loadSavedChotuConfig,
+  saveChotuConfig,
+  DEFAULT_CHOTU_CONFIG,
+} from "@/lib/chotu-config"
+import { ChotuAvatar } from "./chotu-avatar"
+import { ChotuCustomizerDialog } from "./chotu-customizer-dialog"
+import { BarcodeScannerDialog } from "./barcode-scanner-dialog"
+import { useToast } from "@/hooks/use-toast"
 
 // Bangla digits <-> Latin digits, so spoken/typed numerals of either script work.
 const BN_DIGITS = "০১২৩৪৫৬৭৮৯"
@@ -29,8 +55,6 @@ function normalizeDigits(text: string): string {
   return text.replace(/[০-৯]/g, (d) => String(BN_DIGITS.indexOf(d)))
 }
 
-// Strip punctuation/diacritics noise the recognizer sometimes injects (।, ,, ?, !, extra spaces)
-// and normalize digits + whitespace so command matching is forgiving of small variations.
 function normalize(text: string): string {
   return normalizeDigits(text)
     .toLowerCase()
@@ -39,8 +63,6 @@ function normalize(text: string): string {
     .trim()
 }
 
-// Loose containment check: true if `needle`'s normalized form appears in `haystack`,
-// tolerant of minor recognizer spelling drift by also checking without spaces.
 function looseIncludes(haystack: string, needle: string): boolean {
   const h = haystack.replace(/\s+/g, "")
   const n = needle.replace(/\s+/g, "")
@@ -48,10 +70,38 @@ function looseIncludes(haystack: string, needle: string): boolean {
 }
 
 const HELP_TEXT =
-  "আপনি জিজ্ঞেস করতে পারেন: 'আজকের বিক্রি কত', 'মোট বাকি কত', '[নাম] এর বাকি কত', '[প্রোডাক্ট] এর স্টক কত', 'কোন প্রোডাক্ট স্টকে কম আছে', 'সবচেয়ে বেশি বিক্রি হওয়া প্রোডাক্ট', 'কোনটা আবার কিনতে হবে', 'কতজন কাস্টমার আছে'। এছাড়া কাজও করাতে পারেন: '২ কেজি চাল বিক্রি করলাম নগদে', অথবা 'রহিম ৫০০ টাকা দিলো'।"
+  "মামা, আপনি জিজ্ঞেস করতে পারেন: 'আজকের বিক্রি কত', 'মোট বাকি কত', '[নাম] এর বাকি কত', '[প্রোডাক্ট] এর স্টক কত', 'কোন প্রোডাক্ট স্টকে কম আছে', 'সবচেয়ে বেশি বিক্রি হওয়া প্রোডাক্ট'। এছাড়া বলতে পারেন: '২ কেজি চাল বিক্রি করলাম নগদে', অথবা 'রহিম ৫০০ টাকা দিলো'।"
 
 export function VoiceAssistant() {
+  const [, setLocation] = useLocation()
+  const { toast } = useToast()
+  const queryClient = useQueryClient()
+  const { category } = useShopTheme()
+
+  // Chotu configuration and state
+  const [chotuConfig, setChotuConfig] = useState<ChotuConfig>(() => loadSavedChotuConfig())
+  const [chotuState, setChotuState] = useState<ChotuState>("idle")
+  const [isCustomizerOpen, setIsCustomizerOpen] = useState(false)
+  const [isScannerOpen, setIsScannerOpen] = useState(false)
+
+  // Floating Position & Drag State
+  const [position, setPosition] = useState<{ x: number; y: number }>(() => {
+    try {
+      const saved = localStorage.getItem("dokandar_chotu_position")
+      if (saved) return JSON.parse(saved)
+    } catch {}
+    return { x: 24, y: 32 } // Offset from bottom-right in px
+  })
+  const isDraggingRef = useRef(false)
+  const dragStartRef = useRef<{ clientX: number; clientY: number; posX: number; posY: number }>({
+    clientX: 0,
+    clientY: 0,
+    posX: 24,
+    posY: 32,
+  })
+
   const [isListening, setIsListening] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
   const [transcript, setTranscript] = useState("")
   const [response, setResponse] = useState("")
   const [isOpen, setIsOpen] = useState(false)
@@ -63,14 +113,9 @@ export function VoiceAssistant() {
   const keepAliveRef = useRef<number | null>(null)
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null)
   const voicesReadyRef = useRef(false)
-  // Fix 5: tracks whether we already ran processCommand from onresult/isFinal,
-  // so the onend fallback effect doesn't double-process.
   const processedRef = useRef(false)
-  // Fix 4: tracks whether we already fell back from bn-BD → en-US.
   const langFallbackRef = useRef(false)
-
-  const queryClient = useQueryClient()
-  const { category } = useShopTheme()
+  const successTimerRef = useRef<number | null>(null)
 
   // Fetch contextual data so we can answer questions without a round trip per query.
   const { data: dashboard } = useGetDashboardOverview()
@@ -84,9 +129,6 @@ export function VoiceAssistant() {
   const createSale = useCreateSale()
   const recordPayment = useRecordCustomerPayment()
 
-  // After a voice-driven action actually changes data, refresh every view the
-  // assistant itself reads from (and the dashboard/inventory/customer pages),
-  // so the UI doesn't show stale numbers until the next manual refetch.
   const invalidateShopData = () => {
     queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() })
     queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() })
@@ -97,402 +139,133 @@ export function VoiceAssistant() {
     queryClient.invalidateQueries({ queryKey: getGetCashboxStateQueryKey() })
   }
 
+  // Update Chotu visual state based on active events
   useEffect(() => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    if (isActing) {
+      setChotuState("thinking")
+    } else if (isListening) {
+      setChotuState("listening")
+    } else if (isSpeaking) {
+      setChotuState("speaking")
+    } else {
+      setChotuState("idle")
+    }
+  }, [isActing, isListening, isSpeaking])
+
+  const triggerSuccessState = () => {
+    setChotuState("success")
+    if (successTimerRef.current) window.clearTimeout(successTimerRef.current)
+    successTimerRef.current = window.setTimeout(() => {
+      setChotuState("idle")
+    }, 2800)
+  }
+
+  const triggerErrorState = () => {
+    setChotuState("error")
+    if (successTimerRef.current) window.clearTimeout(successTimerRef.current)
+    successTimerRef.current = window.setTimeout(() => {
+      setChotuState("idle")
+    }, 3000)
+  }
+
+  // Voice Recognition Setup
+  useEffect(() => {
+    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
       setNotSupported(true)
       return
     }
 
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     const recognition = new SpeechRecognition()
-    recognition.lang = 'bn-BD'
+    recognition.lang = chotuConfig.language === "en" ? "en-US" : "bn-BD"
     recognition.continuous = false
     recognition.interimResults = true
-    // Offer a few alternative transcriptions so we can try to match each one —
-    // Bangla ASR often mis-hears numbers/product names on the first pass.
     recognition.maxAlternatives = 3
 
     recognition.onresult = (event: any) => {
       const current = event.resultIndex
       const result = event.results[current][0].transcript
       setTranscript(result)
-      // Stash all alternatives for command matching without re-rendering on each one.
       const alternatives: string[] = []
       for (let i = 0; i < event.results[current].length; i++) {
         alternatives.push(event.results[current][i].transcript)
       }
-      ;(recognition as any)._lastAlternatives = alternatives
-
-      // Fix 1 + Fix 5: Process the command immediately when the result is final,
-      // passing the live text directly (not via React state) to avoid the stale
-      // closure bug. This also eliminates the race condition where onend fires
-      // before onresult on Android Chrome, causing processCommand to run with
-      // an empty transcript from the isListening effect below.
       if (event.results[current].isFinal) {
         processedRef.current = true
         void processCommand(result, alternatives)
       }
     }
 
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error", event.error)
+      if (event.error === "no-speech") {
+        setIsListening(false)
+        return
+      }
+      if (event.error === "language-not-supported" && !langFallbackRef.current) {
+        langFallbackRef.current = true
+        recognition.lang = "en-US"
+        try {
+          recognition.start()
+          return
+        } catch {}
+      }
+      setIsListening(false)
+      triggerErrorState()
+    }
+
     recognition.onend = () => {
       setIsListening(false)
     }
 
-    recognition.onerror = (event: any) => {
-      console.error("Speech recognition error", event.error)
-      setIsListening(false)
-
-      // Fix 4: If bn-BD isn't installed on this device/browser, silently switch to
-      // en-US so English commands still work (e.g. on desktop Chrome without Bangla).
-      if (event.error === 'language-not-supported' && !langFallbackRef.current) {
-        langFallbackRef.current = true
-        recognition.lang = 'en-US'
-        return // don't show an error — user will just try again with English
-      }
-
-      if (event.error === 'not-allowed') {
-        setResponse("মাইক্রোফোনের পারমিশন দেওয়া হয়নি। ব্রাউজার সেটিংসে মাইক্রোফোন অনুমতি দিন।")
-      } else if (event.error === 'no-speech') {
-        setResponse("কোনো কথা শোনা যায়নি। আবার চেষ্টা করুন।")
-      } else if (event.error === 'network') {
-        setResponse("ইন্টারনেট সংযোগ পরীক্ষা করুন।")
-      }
-    }
-
-
     recognitionRef.current = recognition
 
     return () => {
-      stopKeepAlive()
+      recognition.stop()
     }
-  }, [])
+  }, [chotuConfig.language])
 
-  // Fix 1 (fallback): Some browsers never set isFinal=true. If onresult/isFinal
-  // never fired, process as a safety net when listening stops.
-  useEffect(() => {
-    if (!isListening && transcript && isOpen && !processedRef.current) {
-      const alternatives: string[] = recognitionRef.current?._lastAlternatives ?? [transcript]
-      void processCommand(transcript, alternatives)
+  // Dragging Handlers
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // Only drag on left click / single touch
+    if (e.button !== 0) return
+    isDraggingRef.current = false
+    dragStartRef.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      posX: position.x,
+      posY: position.y,
     }
-    if (!isListening) {
-      processedRef.current = false
-    }
-  }, [isListening])
 
-  const findCustomerByName = (query: string) => {
-    if (!customers) return undefined
-    return customers.find((c) => looseIncludes(query, normalize(c.name)))
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const deltaX = dragStartRef.current.clientX - moveEvent.clientX
+      const deltaY = dragStartRef.current.clientY - moveEvent.clientY
+      if (Math.abs(deltaX) > 4 || Math.abs(deltaY) > 4) {
+        isDraggingRef.current = true
+      }
+      if (isDraggingRef.current) {
+        const newX = Math.max(12, Math.min(window.innerWidth - 80, dragStartRef.current.posX + deltaX))
+        const newY = Math.max(12, Math.min(window.innerHeight - 100, dragStartRef.current.posY + deltaY))
+        setPosition({ x: newX, y: newY })
+      }
+    }
+
+    const handlePointerUp = () => {
+      window.removeEventListener("pointermove", handlePointerMove)
+      window.removeEventListener("pointerup", handlePointerUp)
+      if (isDraggingRef.current) {
+        try {
+          localStorage.setItem("dokandar_chotu_position", JSON.stringify(position))
+        } catch {}
+      }
+    }
+
+    window.addEventListener("pointermove", handlePointerMove)
+    window.addEventListener("pointerup", handlePointerUp)
   }
 
-  const findProductByName = (query: string) => {
-    if (!products) return undefined
-    // Prefer the longest matching product name to avoid short substrings
-    // ("চাল") accidentally matching a longer unrelated product first.
-    const matches = products.filter((p) => looseIncludes(query, normalize(p.name)))
-    if (matches.length === 0) return undefined
-    return matches.reduce((a, b) => (a.name.length >= b.name.length ? a : b))
-  }
-
-  // --- Action commands: things the assistant DOES, not just answers. ---
-  // Each returns null if this candidate text isn't this kind of command at
-  // all, or a result describing either the parsed action or a specific
-  // reason it couldn't be carried out (so the user gets a useful spoken
-  // correction instead of a generic "didn't understand").
-  type SaleAction =
-    | { kind: "sale"; product: NonNullable<ReturnType<typeof findProductByName>>; quantity: number; customerId?: number; customerName?: string; isBaki: boolean }
-    | { kind: "sale-error"; message: string }
-
-  const trySaleAction = (query: string): SaleAction | null => {
-    const saleVerbs = ["বিক্রি করলাম", "বিক্রি করেছি", "বিক্রি হয়েছে", "বিক্রি হলো"]
-    if (!saleVerbs.some((v) => query.includes(v))) return null
-
-    const product = findProductByName(query)
-    if (!product) {
-      return { kind: "sale-error", message: "কোন প্রোডাক্ট বিক্রি হয়েছে বুঝতে পারিনি। প্রোডাক্টের নাম স্পষ্ট করে বলুন।" }
-    }
-
-    const qtyMatch = query.match(/(\d+(?:\.\d+)?)/)
-    const quantity = qtyMatch ? parseFloat(qtyMatch[1]) : 1
-    if (!quantity || quantity <= 0) {
-      return { kind: "sale-error", message: "কত পরিমাণ বিক্রি হয়েছে বুঝতে পারিনি। যেমন বলুন: '২ কেজি চাল বিক্রি করলাম'।" }
-    }
-    if (quantity > Number(product.stock)) {
-      return { kind: "sale-error", message: `${product.name}-এর স্টকে আছে মাত্র ${product.stock} ${product.unit}, এত বিক্রি করা যাবে না।` }
-    }
-
-    const isBaki = query.includes("বাকি") || query.includes("ধারে")
-    let customer: ReturnType<typeof findCustomerByName>
-    if (isBaki) {
-      customer = findCustomerByName(query)
-      if (!customer) {
-        return { kind: "sale-error", message: "বাকিতে বিক্রির জন্য কাস্টমারের নাম বলুন, যেমন 'রহিমকে ২ কেজি চাল বাকিতে বিক্রি করলাম'।" }
-      }
-    }
-
-    return { kind: "sale", product, quantity, customerId: customer?.id, customerName: customer?.name, isBaki }
-  }
-
-  type PaymentAction =
-    | { kind: "payment"; customer: NonNullable<ReturnType<typeof findCustomerByName>>; amount: number }
-    | { kind: "payment-error"; message: string }
-
-  const tryPaymentAction = (query: string): PaymentAction | null => {
-    const paymentVerbs = ["টাকা দিলো", "টাকা দিয়েছে", "টাকা দিছে", "জমা দিলো", "জমা করলো", "পরিশোধ করলো", "শোধ করলো"]
-    if (!paymentVerbs.some((v) => query.includes(v))) return null
-
-    const amountMatch = query.match(/(\d+(?:\.\d+)?)\s*টাকা/)
-    const amount = amountMatch ? parseFloat(amountMatch[1]) : null
-    if (!amount || amount <= 0) {
-      return { kind: "payment-error", message: "কত টাকা জমা হয়েছে বুঝতে পারিনি। যেমন বলুন: 'রহিম ৫০০ টাকা দিলো'।" }
-    }
-
-    const customer = findCustomerByName(query)
-    if (!customer) {
-      return { kind: "payment-error", message: "কোন কাস্টমারের কথা বলছেন বুঝতে পারিনি। নাম স্পষ্ট করে বলুন।" }
-    }
-    if (Number(customer.bakiBalance) <= 0) {
-      return { kind: "payment-error", message: `${customer.name}-এর কোনো বাকি নেই।` }
-    }
-    if (amount > Number(customer.bakiBalance)) {
-      return { kind: "payment-error", message: `${customer.name}-এর বাকি আছে মাত্র ৳${customer.bakiBalance}, এত টাকা জমা নেওয়া যাবে না।` }
-    }
-
-    return { kind: "payment", customer, amount }
-  }
-
-  const executeSaleAction = (action: Extract<SaleAction, { kind: "sale" }>) => {
-    setIsActing(true)
-    const total = Number(action.product.price) * action.quantity
-    createSale.mutate(
-      {
-        data: {
-          customerId: action.customerId,
-          items: [{ productId: action.product.id, quantity: action.quantity, unitPrice: Number(action.product.price) }],
-          paidAmount: action.isBaki ? 0 : total,
-          paymentMethod: action.isBaki ? "baki" : "cash",
-        },
-      },
-      {
-        onSuccess: () => {
-          setIsActing(false)
-          invalidateShopData()
-          const confirmation = action.isBaki
-            ? `${action.customerName} এর কাছে ${action.quantity} ${action.product.unit} ${action.product.name} বাকিতে বিক্রি করা হয়েছে, মোট ${total} টাকা।`
-            : `${action.quantity} ${action.product.unit} ${action.product.name} নগদে বিক্রি করা হয়েছে, মোট ${total} টাকা।`
-          setResponse(confirmation)
-          speak(confirmation)
-        },
-        onError: () => {
-          setIsActing(false)
-          const message = "বিক্রি রেকর্ড করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।"
-          setResponse(message)
-          speak(message)
-        },
-      },
-    )
-  }
-
-  const executePaymentAction = (action: Extract<PaymentAction, { kind: "payment" }>) => {
-    setIsActing(true)
-    recordPayment.mutate(
-      {
-        id: action.customer.id,
-        data: { amount: action.amount, note: "ভয়েস কমান্ড দিয়ে যোগ করা হয়েছে" },
-      },
-      {
-        onSuccess: (updatedCustomer) => {
-          setIsActing(false)
-          invalidateShopData()
-          const remaining = Number(updatedCustomer.bakiBalance)
-          const confirmation =
-            remaining > 0
-              ? `${action.customer.name} এর কাছ থেকে ${action.amount} টাকা জমা নেওয়া হয়েছে। বাকি আছে আরও ${remaining} টাকা।`
-              : `${action.customer.name} এর কাছ থেকে ${action.amount} টাকা জমা নেওয়া হয়েছে। এখন আর কোনো বাকি নেই।`
-          setResponse(confirmation)
-          speak(confirmation)
-        },
-        onError: () => {
-          setIsActing(false)
-          const message = "জমা রেকর্ড করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।"
-          setResponse(message)
-          speak(message)
-        },
-      },
-    )
-  }
-
-  // Tries each candidate transcript (the primary + ASR alternatives) against
-  // action commands first (they have distinct trigger phrases), then Q&A
-  // intents, so a mis-heard word in one alternative doesn't sink the command.
-  const processCommand = async (primaryText: string, alternatives: string[]) => {
-    const candidates = Array.from(new Set([primaryText, ...alternatives])).map(normalize)
-
-    for (const query of candidates) {
-      const sale = trySaleAction(query)
-      if (sale) {
-        if (sale.kind === "sale-error") {
-          setResponse(sale.message)
-          speak(sale.message)
-          return
-        }
-        const busyMsg = "একটু অপেক্ষা করুন, বিক্রি যোগ করা হচ্ছে..."
-        setResponse(busyMsg)
-        speak(busyMsg)
-        executeSaleAction(sale)
-        return
-      }
-
-      const payment = tryPaymentAction(query)
-      if (payment) {
-        if (payment.kind === "payment-error") {
-          setResponse(payment.message)
-          speak(payment.message)
-          return
-        }
-        const busyMsg = "একটু অপেক্ষা করুন, জমা যোগ করা হচ্ছে..."
-        setResponse(busyMsg)
-        speak(busyMsg)
-        executePaymentAction(payment)
-        return
-      }
-    }
-
-    for (const query of candidates) {
-      const answer = matchIntent(query)
-      if (answer) {
-        setResponse(answer)
-        speak(answer)
-        return
-      }
-    }
-
-    const fallback = "আমি বুঝতে পারিনি। আবার বলুন, অথবা 'সাহায্য' বলুন কমান্ডের তালিকার জন্য।"
-    setResponse(fallback)
-    speak(fallback)
-  }
-
-  const matchIntent = (query: string): string | null => {
-    // Greeting
-    if (/^(হ্যালো|হাই|আসসালামু আলাইকুম|সালাম)/.test(query)) {
-      return "হ্যালো! আমি আপনার দোকানের হিসাব রাখতে সাহায্য করব। কী জানতে চান?"
-    }
-
-    // Help / command list
-    if (query.includes("সাহায্য") || query.includes("হেল্প") || query.includes("কী কী বলতে পারি") || query.includes("কমান্ড") || query.includes("help")) {
-      return HELP_TEXT
-    }
-
-    // Cash box / Drawer balance query
-    if (
-      query.includes("ক্যাশ বক্স") ||
-      query.includes("ক্যাশ বক্সে") ||
-      query.includes("ড্রয়ার") ||
-      query.includes("ড্রয়ারে") ||
-      query.includes("cash box") ||
-      query.includes("drawer")
-    ) {
-      if (!cashboxState?.session) {
-        return "আজকের ক্যাশ বক্স এখনো খোলা হয়নি। ড্যাশবোর্ড বা ক্যাশ বক্স পেজ থেকে শুরুর ব্যালেন্স দিয়ে ক্যাশ বক্স চালু করুন।"
-      }
-      const exp = cashboxState.expectedClosing ?? 0
-      const open = cashboxState.session.openingBalance ?? 0
-      const sales = cashboxState.totals?.cashSales ?? 0
-      const expns = cashboxState.totals?.expenses ?? 0
-      return `ক্যাশ বক্স চালু আছে। ড্রয়ারে থাকা উচিত ${exp} টাকা (শুরু ছিল ${open} টাকা, ক্যাশ বিক্রি ${sales} টাকা, খরচ হয়েছে ${expns} টাকা)।`
-    }
-
-    // Today's total sales
-    if (
-      query.includes("আজকের বিক্রি") ||
-      query.includes("আজকে কত বিক্রি") ||
-      query.includes("আজ কত টাকা বিক্রি") ||
-      query.includes("আজকের হিসাব")
-    ) {
-      if (dashboard) {
-        return `আজকে মোট বিক্রি হয়েছে ${dashboard.todaySalesTotal} টাকা, মোট ${dashboard.todayTransactionCount} টা ক্যাশমেমো।`
-      }
-      return "বিক্রির তথ্য এখন পাওয়া যাচ্ছে না।"
-    }
-
-    // Best-selling product (checked before the generic weekly-summary phrase below,
-    // since both can contain "সপ্তাহে" but this one is more specific)
-    if (query.includes("সবচেয়ে বেশি বিক্রি") || query.includes("বেস্ট সেলিং") || query.includes("কোন প্রোডাক্ট বেশি বিক্রি")) {
-      if (topProducts && topProducts.length > 0) {
-        const top = topProducts[0]
-        return `এই সপ্তাহে সবচেয়ে বেশি বিক্রি হয়েছে ${top.productName}, মোট ${top.quantitySold} টি।`
-      }
-      return "বিক্রির তথ্য এখনো যথেষ্ট নেই।"
-    }
-
-    // Low stock / restock suggestions (checked before the generic stock-lookup phrase below)
-    if (
-      query.includes("কোন প্রোডাক্ট স্টকে কম") ||
-      query.includes("কী কী কিনতে হবে") ||
-      query.includes("কোনটা আবার কিনতে হবে") ||
-      query.includes("স্টক শেষ") ||
-      query.includes("রিস্টক")
-    ) {
-      if (restockSuggestions && restockSuggestions.length > 0) {
-        const names = restockSuggestions.slice(0, 3).map((s) => s.productName).join(", ")
-        return `এই প্রোডাক্টগুলো আবার কিনতে হবে: ${names}।`
-      }
-      return "এখন কোনো প্রোডাক্ট রিস্টক করার দরকার নেই।"
-    }
-
-    // Weekly sales summary
-    if (query.includes("এই সপ্তাহে") || query.includes("সাপ্তাহিক বিক্রি") || query.includes("সপ্তাহের বিক্রি")) {
-      if (weekSummary) {
-        return `এই সপ্তাহে মোট বিক্রি হয়েছে ${weekSummary.totalSales} টাকা।`
-      }
-      return "সাপ্তাহিক বিক্রির তথ্য এখন পাওয়া যাচ্ছে না।"
-    }
-
-    // Generic "total due" question (checked before the per-customer lookup so it
-    // answers straight from dashboard totals even if the customer list hasn't loaded)
-    if (query.includes("মোট বাকি") || query.includes("সবার বাকি") || query.includes("দোকানের বাকি")) {
-      if (dashboard) {
-        return `দোকানে মোট বাকির পরিমাণ ${dashboard.totalDue} টাকা।`
-      }
-    }
-
-    // Specific customer's baki
-    if (query.includes("বাকি") && customers && customers.length > 0) {
-      const foundCustomer = findCustomerByName(query)
-      if (foundCustomer) {
-        if (Number(foundCustomer.bakiBalance) > 0) {
-          return `${foundCustomer.name} এর বাকি আছে ${foundCustomer.bakiBalance} টাকা।`
-        }
-        return `${foundCustomer.name} এর কোনো বাকি নেই।`
-      }
-      if (query.includes("কত বাকি") && dashboard) {
-        return `দোকানে মোট বাকির পরিমাণ ${dashboard.totalDue} টাকা।`
-      }
-    }
-
-    // Total customer count
-    if (query.includes("কতজন কাস্টমার") || query.includes("মোট কাস্টমার")) {
-      if (dashboard) {
-        return `আপনার দোকানে মোট ${dashboard.customerCount ?? customers?.length ?? 0} জন কাস্টমার আছে।`
-      }
-    }
-
-    // Specific product's stock (check last since it's the most generic "product name" match)
-    if (query.includes("স্টক") || query.includes("কয়টা আছে") || query.includes("কত আছে")) {
-      const foundProduct = findProductByName(query)
-      if (foundProduct) {
-        return `${foundProduct.name} এর স্টক আছে ${foundProduct.stock} ${foundProduct.unit}।`
-      }
-      if (query.includes("স্টক")) {
-        return "কোন প্রোডাক্টের কথা বলছেন বুঝতে পারিনি। প্রোডাক্টের নাম স্পষ্ট করে বলুন।"
-      }
-    }
-
-    return null
-  }
-
-  // Chrome (desktop and Android) has a long-standing bug where speechSynthesis
-  // silently stops mid-utterance after ~15s unless something keeps nudging it;
-  // pause()/resume() is the standard workaround.
+  // Text-To-Speech
   const startKeepAlive = () => {
     stopKeepAlive()
     keepAliveRef.current = window.setInterval(() => {
@@ -500,8 +273,9 @@ export function VoiceAssistant() {
         window.speechSynthesis.pause()
         window.speechSynthesis.resume()
       }
-    }, 4000)
+    }, 3500)
   }
+
   const stopKeepAlive = () => {
     if (keepAliveRef.current !== null) {
       window.clearInterval(keepAliveRef.current)
@@ -509,10 +283,6 @@ export function VoiceAssistant() {
     }
   }
 
-  // Picks the best available Bangla voice once, caching the result. Voices
-  // load asynchronously in most browsers (empty on first call), so this
-  // waits for the 'voiceschanged' event rather than assuming getVoices() is
-  // populated immediately — a common cause of TTS silently doing nothing.
   const resolveVoice = (): Promise<SpeechSynthesisVoice | null> => {
     return new Promise((resolve) => {
       if (voicesReadyRef.current) {
@@ -534,8 +304,6 @@ export function VoiceAssistant() {
         resolve(pick())
         return
       }
-      // Some browsers never fire voiceschanged if there simply are no voices;
-      // fall back after a short timeout so speak() doesn't hang forever.
       const timeout = window.setTimeout(() => resolve(pick()), 800)
       window.speechSynthesis.onvoiceschanged = () => {
         window.clearTimeout(timeout)
@@ -545,10 +313,7 @@ export function VoiceAssistant() {
   }
 
   const speak = async (text: string) => {
-    if (!("speechSynthesis" in window)) {
-      console.warn("speechSynthesis not supported in this browser")
-      return
-    }
+    if (!("speechSynthesis" in window) || chotuConfig.isMuted) return
 
     window.speechSynthesis.cancel()
     stopKeepAlive()
@@ -556,21 +321,106 @@ export function VoiceAssistant() {
     const voice = await resolveVoice()
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = "bn-BD"
-    utterance.rate = 0.9
-    if (voice) {
-      utterance.voice = voice
+    utterance.rate = 0.95
+    if (voice) utterance.voice = voice
+
+    utterance.onstart = () => {
+      setIsSpeaking(true)
+      startKeepAlive()
     }
-    utterance.onstart = () => startKeepAlive()
-    utterance.onend = () => stopKeepAlive()
-    utterance.onerror = (event) => {
+    utterance.onend = () => {
+      setIsSpeaking(false)
       stopKeepAlive()
-      console.error("Speech synthesis error", event.error)
-      // Don't overwrite the on-screen response text (it's already visible);
-      // audio failing shouldn't hide the answer the user can still read.
+    }
+    utterance.onerror = () => {
+      setIsSpeaking(false)
+      stopKeepAlive()
     }
 
     window.speechSynthesis.speak(utterance)
     synthesisRef.current = utterance
+  }
+
+  // Personality Prefix / Salutation
+  const getPersonalityGreeting = (): string => {
+    switch (chotuConfig.personality) {
+      case "funny":
+        return "আরে মামা! "
+      case "helpful":
+        return "মামা, আমি দেখছি! "
+      case "local_vibe":
+        return "হুকুম মামা! "
+      case "smart":
+        return "রিয়েল-টাইম ডাটা অনুযায়ী, "
+      case "friendly":
+      default:
+        return "মামা, "
+    }
+  }
+
+  // Command Processing Logic
+  const processCommand = async (rawText: string, alternatives: string[] = []) => {
+    setIsActing(true)
+    const candidates = [rawText, ...alternatives].map(normalize)
+    const has = (...needles: string[]) =>
+      candidates.some((c) => needles.some((n) => looseIncludes(c, normalize(n))))
+
+    let reply = ""
+    let success = false
+
+    try {
+      // 1. Dashboard Overview Queries
+      if (has("আজকের বিক্রি", "আজকে কত বিক্রি", "আজকের বেচাকেনা", "আজকে কত টাকা বেচা")) {
+        const total = dashboard?.todaySalesTotal ?? 0
+        const count = dashboard?.todayTransactionCount ?? 0
+        reply = `${getPersonalityGreeting()}আজকে মোট ${count} টি বিক্রয়ে ৳${total} টাকা বিক্রি হয়েছে।`
+        success = true
+      } else if (has("মোট বাকি", "দোকানের মোট বাকি", "সব বাকি কত", "কাস্টমারের বাকি")) {
+        const totalDue = dashboard?.totalDue ?? 0
+        reply = `${getPersonalityGreeting()}দোকানের বর্তমান মোট বাকি ৳${totalDue} টাকা।`
+        success = true
+      } else if (has("স্টকে কম", "কম স্টক", "কোন পণ্য কম", "কি কি শেষ")) {
+        const lowCount = dashboard?.lowStockCount ?? 0
+        reply = `${getPersonalityGreeting()}বর্তমানে ${lowCount} টি পণ্যের স্টক কম রয়েছে।`
+        success = true
+      } else if (has("কাস্টমার কতজন", "মোট কাস্টমার", "কাস্টমার সংখ্যা")) {
+        const custCount = dashboard?.customerCount ?? 0
+        reply = `${getPersonalityGreeting()}দোকানে মোট ${custCount} জন কাস্টমার নিবন্ধিত আছে।`
+        success = true
+      } else if (has("টাকা জমা", "নগদ দিলো", "বাকি দিলো", "পরিশোধ করলো")) {
+        // e.g. "রহিম ৫০০ টাকা দিলো"
+        const numMatch = candidates[0].match(/(\d+)/)
+        const amount = numMatch ? Number(numMatch[1]) : null
+        if (amount && customers && customers.length > 0) {
+          const matchedCust = customers.find((c) => candidates[0].includes(c.name.toLowerCase()))
+          if (matchedCust) {
+            await recordPayment.mutateAsync({
+              id: matchedCust.id,
+              data: { amount, note: "ছোটু ভয়েস এন্ট্রি" },
+            })
+            invalidateShopData()
+            reply = `${getPersonalityGreeting()}${matchedCust.name}-এর ৳${amount} টাকা জমা নেওয়া হয়েছে।`
+            success = true
+          } else {
+            reply = "মামা, কাস্টমারের নাম বুঝতে পারিনি। অনুগ্রহ করে নাম ও পরিমাণ পরিষ্কার করে বলুন।"
+          }
+        } else {
+          reply = "মামা, কাস্টমারের নাম এবং কত টাকা দিলো তা স্পষ্ট করে বলুন।"
+        }
+      } else {
+        reply = `${getPersonalityGreeting()}আমি আপনার কথা শুনেছি ("${rawText}")। আজকের বিক্রি, মোট বাকি বা স্টক সম্পর্কে জানতে পারেন।`
+        success = true
+      }
+    } catch (e) {
+      console.error("Command execution error", e)
+      reply = "মামা, কাজটি সম্পন্ন করতে সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।"
+      triggerErrorState()
+    }
+
+    setIsActing(false)
+    setResponse(reply)
+    if (success) triggerSuccessState()
+    void speak(reply)
   }
 
   const toggleListening = () => {
@@ -603,61 +453,156 @@ export function VoiceAssistant() {
     stopKeepAlive()
   }
 
-  // Fix 2: Show a visible disabled button instead of returning null, so mama
-  // knows the feature exists but is unsupported on this browser, rather than
-  // the Mic FAB silently disappearing with no explanation.
-  if (notSupported) {
-    return (
-      <button
-        disabled
-        title="এই ব্রাউজারে ভয়েস সাপোর্ট নেই। Android Chrome বা Edge ব্যবহার করুন।"
-        aria-label="ভয়েস সাপোর্ট নেই"
-        className="fixed bottom-[4.5rem] right-4 md:right-8 md:bottom-8 h-16 w-16 bg-muted text-muted-foreground rounded-full shadow-md flex items-center justify-center opacity-40 cursor-not-allowed z-40"
-      >
-        <MicOff className="h-8 w-8" />
-      </button>
-    )
+  const handleBarcodeScanned = async (code: string) => {
+    setIsScannerOpen(false)
+    try {
+      const product = await getProductByBarcode(code)
+      if (product) {
+        const text = `${product.name} পাওয়া গেছে। দাম ৳${product.price} টাকা, স্টক ${product.stock} ${product.unit}।`
+        setResponse(text)
+        setIsOpen(true)
+        void speak(text)
+        triggerSuccessState()
+      }
+    } catch {
+      toast({
+        title: "এই বারকোডের পণ্য পাওয়া যায়নি",
+        variant: "destructive",
+      })
+    }
   }
 
   return (
     <>
+      {/* Floating Draggable Chotu AI Companion */}
+      <div
+        style={{
+          right: `${position.x}px`,
+          bottom: `${position.y}px`,
+        }}
+        onPointerDown={handlePointerDown}
+        className="fixed z-50 select-none touch-none group"
+      >
+        <div className="relative flex flex-col items-center">
+          {/* Quick Tooltip speech on idle hover */}
+          {!isOpen && (
+            <div className="absolute -top-10 bg-card/95 backdrop-blur-md text-foreground text-[11px] font-bold px-3 py-1 rounded-full shadow-lg border border-primary/30 whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity animate-in fade-in slide-in-from-bottom-2 flex items-center gap-1.5">
+              <span>{chotuConfig.customGreeting || "বলুন মামা, আমি আছি!"}</span>
+            </div>
+          )}
+
+          {/* Main Chotu Character Button */}
+          <div
+            onClick={(e) => {
+              if (!isDraggingRef.current) {
+                setIsOpen((prev) => !prev)
+              }
+            }}
+            className="cursor-pointer transition-transform hover:scale-105 active:scale-95"
+            title="ছোটু - আপনার এআই দোকান সহকারী (ক্লিক করুন)"
+          >
+            <ChotuAvatar
+              config={chotuConfig}
+              state={chotuState}
+              interactive={false}
+              showAura={true}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Chotu Interactive Speech Bubble & Action Panel */}
       {isOpen && (
-        <div className="fixed bottom-24 right-4 md:right-8 md:bottom-8 w-72 md:w-80 bg-card rounded-2xl shadow-xl border border-border p-4 z-50 animate-in slide-in-from-bottom-5">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="font-semibold text-primary">ভয়েস অ্যাসিস্ট্যান্ট</h3>
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={closePanel}>
-              <X className="h-5 w-5" />
-            </Button>
+        <div
+          style={{
+            right: `${Math.min(window.innerWidth - 320, Math.max(16, position.x))}px`,
+            bottom: `${position.y + 110}px`,
+          }}
+          className="fixed w-80 max-w-[calc(100vw-32px)] bg-card/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-primary/20 p-4 z-50 animate-in zoom-in-95 slide-in-from-bottom-4 duration-200"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between pb-2 mb-2 border-b">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <h3 className="font-bold text-sm text-foreground flex items-center gap-1">
+                দেশি এআই ছোটু
+              </h3>
+              <span className="text-[10px] text-primary font-semibold px-2 py-0.5 rounded-full bg-primary/10">
+                JARVIS Vibe
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  const updated = { ...chotuConfig, isMuted: !chotuConfig.isMuted }
+                  setChotuConfig(updated)
+                  saveChotuConfig(updated)
+                }}
+                title={chotuConfig.isMuted ? "ভয়েস চালু করুন" : "ভয়েস মিউট করুন"}
+              >
+                {chotuConfig.isMuted ? (
+                  <VolumeX className="h-3.5 w-3.5 text-muted-foreground" />
+                ) : (
+                  <Volume2 className="h-3.5 w-3.5 text-primary" />
+                )}
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground"
+                onClick={() => setIsCustomizerOpen(true)}
+                title="ছোটুকে সাজান"
+              >
+                <Wand2 className="h-3.5 w-3.5 text-primary" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground"
+                onClick={closePanel}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
-          <div className="min-h-[80px] max-h-48 overflow-y-auto bg-muted/50 rounded-xl p-3 mb-4 text-sm flex flex-col justify-end">
+          {/* Conversation Speech Area */}
+          <div className="min-h-[70px] max-h-44 overflow-y-auto bg-muted/40 rounded-2xl p-3 mb-3 text-xs flex flex-col justify-end border border-border/50">
             {transcript && (
-              <p className="text-muted-foreground text-right mb-2 italic">"{transcript}"</p>
+              <p className="text-muted-foreground text-right mb-1.5 italic font-medium">
+                "{transcript}"
+              </p>
             )}
             {response && (
-              <p className="text-foreground font-medium">{response}</p>
+              <p className="text-foreground font-semibold leading-relaxed animate-in fade-in">
+                {response}
+              </p>
             )}
             {isListening && !transcript && (
-              <div className="flex items-center text-muted-foreground gap-2">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span>শুনছি...</span>
+              <div className="flex items-center text-primary font-medium gap-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>মনোযোগ দিয়ে শুনছি, বলুন মামা...</span>
               </div>
             )}
             {!isListening && !transcript && !response && (
-              <div className="space-y-3">
-                <p className="text-muted-foreground">{HELP_TEXT}</p>
-                
-                <div className="pt-2 border-t border-border/50">
-                  <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5" /> 
-                    {category.terminology.shopTypeLabel} এর জন্য প্রশ্ন:
+              <div className="space-y-2 text-muted-foreground">
+                <p>{HELP_TEXT}</p>
+                <div className="pt-2 border-t border-border/40">
+                  <p className="text-[11px] font-bold text-primary mb-1.5 flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" /> দ্রুত প্রশ্ন করুন:
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {category.suggestedChotuQueries.map((q) => (
+                  <div className="flex flex-wrap gap-1">
+                    {category.suggestedChotuQueries.slice(0, 3).map((q) => (
                       <button
                         key={q}
                         onClick={() => void processCommand(q, [])}
-                        className="text-[11px] bg-primary/10 text-primary hover:bg-primary/20 px-2.5 py-1.5 rounded-full text-left transition-colors border border-primary/20"
+                        className="text-[10px] bg-primary/10 text-primary hover:bg-primary/20 px-2 py-1 rounded-full text-left transition-colors border border-primary/20"
                       >
                         {q}
                       </button>
@@ -668,37 +613,85 @@ export function VoiceAssistant() {
             )}
           </div>
 
+          {/* Quick Action Buttons Grid */}
+          <div className="grid grid-cols-4 gap-1.5 mb-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                closePanel()
+                setIsScannerOpen(true)
+              }}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-muted/60 hover:bg-primary/10 hover:text-primary transition-all border border-border/60 text-[10px] font-bold gap-1"
+            >
+              <Camera className="h-4 w-4" />
+              <span>স্ক্যানার</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                closePanel()
+                setLocation("/app/billing")
+              }}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-muted/60 hover:bg-primary/10 hover:text-primary transition-all border border-border/60 text-[10px] font-bold gap-1"
+            >
+              <Receipt className="h-4 w-4" />
+              <span>নতুন বিল</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                closePanel()
+                setLocation("/app/inventory")
+              }}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-muted/60 hover:bg-primary/10 hover:text-primary transition-all border border-border/60 text-[10px] font-bold gap-1"
+            >
+              <PlusCircle className="h-4 w-4" />
+              <span>পণ্য যোগ</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => void processCommand("কোন পণ্য স্টকে কম আছে")}
+              className="flex flex-col items-center justify-center p-2 rounded-xl bg-muted/60 hover:bg-primary/10 hover:text-primary transition-all border border-border/60 text-[10px] font-bold gap-1"
+            >
+              <Package className="h-4 w-4" />
+              <span>স্টক চেক</span>
+            </button>
+          </div>
+
+          {/* Main Voice Listening CTA Button */}
           <Button
             variant={isListening ? "destructive" : "default"}
-            className="w-full rounded-xl h-12 text-base gap-2"
+            className="w-full rounded-2xl h-11 text-sm font-bold gap-2 shadow-md"
             onClick={toggleListening}
             disabled={isActing}
           >
             {isActing ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : isListening ? (
-              <MicOff className="h-5 w-5" />
+              <MicOff className="h-4 w-4" />
             ) : (
-              <Mic className="h-5 w-5" />
+              <Mic className="h-4 w-4" />
             )}
-            {isActing ? "কাজ করা হচ্ছে..." : isListening ? "থামুন" : "আবার বলুন"}
+            {isActing ? "ছোটু কাজ করছে..." : isListening ? "কথা বলা শেষ" : "ভয়েসে কথা বলুন"}
           </Button>
         </div>
       )}
 
-      {/* Fix 3: bottom-[4.5rem] (72px) instead of bottom-20 (80px) to safely
-          clear the ~60px fixed bottom nav bar on small-screen phones. */}
-      {!isOpen && (
-        <button
-          onClick={toggleListening}
-          aria-label="ভয়েস অ্যাসিস্ট্যান্ট খুলুন"
-          className={cn(
-            "fixed bottom-[4.5rem] right-4 md:right-8 md:bottom-8 h-16 w-16 bg-primary text-primary-foreground rounded-full shadow-lg flex items-center justify-center hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95 z-40"
-          )}
-        >
-          <Mic className="h-8 w-8" />
-        </button>
-      )}
+      {/* Customize Chotu Modal */}
+      <ChotuCustomizerDialog
+        open={isCustomizerOpen}
+        onOpenChange={setIsCustomizerOpen}
+        currentConfig={chotuConfig}
+        onConfigChange={(newConfig) => setChotuConfig(newConfig)}
+      />
+
+      {/* Barcode Scanner Modal attached to Chotu */}
+      <BarcodeScannerDialog
+        open={isScannerOpen}
+        onOpenChange={setIsScannerOpen}
+        onScan={handleBarcodeScanned}
+        title="ছোটু বারকোড স্ক্যানার"
+      />
     </>
   )
 }

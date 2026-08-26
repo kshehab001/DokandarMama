@@ -41,6 +41,8 @@ function serializeSale(
     paidAmount: toNum(row.paidAmount),
     dueAmount: toNum(row.dueAmount),
     paymentMethod: row.paymentMethod,
+    digitalProvider: row.digitalProvider,
+    digitalTrxId: row.digitalTrxId,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -115,6 +117,12 @@ router.post("/sales", async (req, res): Promise<void> => {
       .json({ error: "নগদ পেমেন্টে সম্পূর্ণ বিলের টাকা পরিশোধ করতে হবে" });
     return;
   }
+  if (paymentMethod === "digital" && paidAmount !== total) {
+    res
+      .status(400)
+      .json({ error: "ডিজিটাল পেমেন্টে সম্পূর্ণ বিলের টাকা পরিশোধ করতে হবে" });
+    return;
+  }
   if (paymentMethod === "baki" && paidAmount !== 0) {
     res.status(400).json({ error: "বাকি পেমেন্টে কোনো টাকা পরিশোধ করা যাবে না" });
     return;
@@ -182,6 +190,9 @@ router.post("/sales", async (req, res): Promise<void> => {
         }
       }
 
+      const digitalProvider = parsed.data.digitalProvider ?? (paymentMethod === "digital" ? "bkash" : null);
+      const digitalTrxId = (parsed.data as any).digitalTrxId ?? null;
+
       const [sale] = await tx
         .insert(salesTable)
         .values({
@@ -195,6 +206,8 @@ router.post("/sales", async (req, res): Promise<void> => {
           paidAmount: String(paidAmount),
           dueAmount: String(dueAmount),
           paymentMethod,
+          digitalProvider: digitalProvider ?? null,
+          digitalTrxId: digitalTrxId ?? null,
         })
         .returning();
 
@@ -281,7 +294,10 @@ router.post("/sales", async (req, res): Promise<void> => {
             sessionId: openSession.id,
             type: "sale",
             amount: String(paidAmount),
-            note: `বিল #${sale.id} বিক্রি`,
+            note:
+              paymentMethod === "digital"
+                ? `বিল #${sale.id} ডিজিটাল বিক্রি (${digitalProvider || "bKash"}${digitalTrxId ? ` - Trx: ${digitalTrxId}` : ""})`
+                : `বিল #${sale.id} বিক্রি`,
             saleId: sale.id,
             createdByUserId: userId,
           });

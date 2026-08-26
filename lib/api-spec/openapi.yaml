@@ -1296,6 +1296,7 @@ components:
         paymentMethod: { type: string, enum: [cash, baki, mixed, digital] }
         digitalAmount: { type: number }
         digitalProvider: { type: string, nullable: true }
+        digitalTrxId: { type: string, nullable: true }
 
     Sale:
       type: object
@@ -1325,6 +1326,7 @@ components:
         paymentMethod: { type: string, enum: [cash, baki, mixed, digital] }
         digitalAmount: { type: number }
         digitalProvider: { type: string, nullable: true }
+        digitalTrxId: { type: string, nullable: true }
         createdAt: { type: string }
 
     DashboardOverview:

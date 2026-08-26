@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { SaleItemInput, SaleInputPaymentMethod } from "@workspace/api-client-react"
 import { BarcodeScannerDialog } from "@/components/barcode-scanner-dialog"
+import { cn } from "@/lib/utils"
 
 type CartItem = {
   product: any;
@@ -31,6 +32,8 @@ export function Billing() {
   const [cart, setCart] = useState<CartItem[]>([])
   
   const [paymentMethod, setPaymentMethod] = useState<SaleInputPaymentMethod>('cash')
+  const [digitalProvider, setDigitalProvider] = useState<string>("bkash")
+  const [digitalTrxId, setDigitalTrxId] = useState<string>("")
   const [paidAmountStr, setPaidAmountStr] = useState("")
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null)
   
@@ -115,7 +118,7 @@ export function Billing() {
   }
 
   // Actually submits the sale. For cash sales this runs after mama confirms
-  // the received-amount/change popup; for baki/mixed it runs right away.
+  // the received-amount/change popup; for baki/mixed/digital it runs right away.
   const submitSale = (paidAmount: number) => {
     const items: SaleItemInput[] = cart.map(item => ({
       productId: item.product.id,
@@ -128,8 +131,10 @@ export function Billing() {
         customerId: selectedCustomerId || undefined,
         items,
         paidAmount,
-        paymentMethod
-      }
+        paymentMethod,
+        digitalProvider: paymentMethod === 'digital' ? digitalProvider : undefined,
+        digitalTrxId: paymentMethod === 'digital' ? (digitalTrxId || undefined) : undefined,
+      } as any
     }, {
       onSuccess: (sale) => {
         toast({ title: "বিল সফলভাবে তৈরি হয়েছে!" })
@@ -276,29 +281,78 @@ export function Billing() {
             </div>
             
             <div className="w-full space-y-3">
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-1.5">
                 <Button 
                   variant={paymentMethod === 'cash' ? 'default' : 'outline'} 
-                  className="rounded-xl h-12"
+                  className="rounded-xl h-11 text-sm font-bold"
                   onClick={() => setPaymentMethod('cash')}
                 >
                   নগদ
                 </Button>
                 <Button 
+                  variant={paymentMethod === 'digital' ? 'default' : 'outline'} 
+                  className="rounded-xl h-11 text-sm font-bold"
+                  onClick={() => setPaymentMethod('digital')}
+                >
+                  ডিজিটাল
+                </Button>
+                <Button 
                   variant={paymentMethod === 'baki' ? 'default' : 'outline'} 
-                  className="rounded-xl h-12"
+                  className="rounded-xl h-11 text-sm font-bold"
                   onClick={() => setPaymentMethod('baki')}
                 >
                   বাকি
                 </Button>
                 <Button 
                   variant={paymentMethod === 'mixed' ? 'default' : 'outline'} 
-                  className="rounded-xl h-12"
+                  className="rounded-xl h-11 text-sm font-bold"
                   onClick={() => setPaymentMethod('mixed')}
                 >
                   আংশিক
                 </Button>
               </div>
+
+              {paymentMethod === 'digital' && (
+                <div className="space-y-3 p-3 rounded-2xl bg-muted/40 border border-border/80 animate-in fade-in slide-in-from-top-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">পেমেন্ট মেথড সিলেক্ট করুন</Label>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[
+                        { id: 'bkash', label: 'বিকাশ', bg: 'bg-[#d12053] text-white hover:bg-[#b01742]' },
+                        { id: 'nagad', label: 'নগদ', bg: 'bg-[#f7941d] text-white hover:bg-[#d67e15]' },
+                        { id: 'rocket', label: 'রকেট', bg: 'bg-[#8c3494] text-white hover:bg-[#722979]' },
+                        { id: 'upay', label: 'উপায়', bg: 'bg-[#ffc800] text-black hover:bg-[#e0b000]' },
+                        { id: 'card', label: 'কার্ড/POS', bg: 'bg-blue-600 text-white hover:bg-blue-700' },
+                        { id: 'qr', label: 'বাংলা QR', bg: 'bg-emerald-600 text-white hover:bg-emerald-700' },
+                      ].map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setDigitalProvider(p.id)}
+                          className={cn(
+                            "h-9 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center border",
+                            digitalProvider === p.id
+                              ? `${p.bg} shadow-sm border-transparent scale-[1.02]`
+                              : "bg-background text-muted-foreground border-border hover:bg-muted"
+                          )}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs">ট্রানজেকশন আইডি / ফোন নাম্বার (ঐচ্ছিক)</Label>
+                    <Input
+                      value={digitalTrxId}
+                      onChange={e => setDigitalTrxId(e.target.value)}
+                      placeholder="যেমন: 8N7A6D..."
+                      className="h-10 text-sm font-mono rounded-xl bg-background"
+                    />
+                  </div>
+                </div>
+              )}
 
               {(paymentMethod === 'baki' || paymentMethod === 'mixed') && (
                 <div className="space-y-3 animate-in fade-in slide-in-from-top-2">

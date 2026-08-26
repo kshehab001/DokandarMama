@@ -32,6 +32,8 @@ export const salesTable = pgTable("sales", {
   paymentMethod: text("payment_method", {
     enum: ["cash", "baki", "mixed", "digital"],
   }).notNull(),
+  digitalProvider: text("digital_provider"),
+  digitalTrxId: text("digital_trx_id"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
