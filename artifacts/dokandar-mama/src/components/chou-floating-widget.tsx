@@ -296,9 +296,8 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
   return (
     <div
       ref={widgetRef}
-      className="fixed z-[90] select-none"
+      className="fixed bottom-20 right-6 z-[90] select-none"
       style={{
-        transform: `translate(${position.x}px, ${position.y}px)`,
         touchAction: "none",
         willChange: "transform",
       }}

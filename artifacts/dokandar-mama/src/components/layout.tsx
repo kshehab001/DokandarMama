@@ -22,7 +22,6 @@ import {
   Globe,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { VoiceAssistant } from "./voice-assistant"
 import { ChouFloatingWidget } from "./chou-floating-widget"
 import { useClerk, useUser } from "@clerk/react"
 import { useShopTheme } from "@/context/shop-theme-context"
@@ -359,10 +358,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         })}
       </nav>
 
-      {/* Floating Chotu Widget — persistent across all navigation */}
-      {/* The ChouFloatingWidget wraps the existing VoiceAssistant NLP engine */}
+      {/* Single Persistent Chotu Genie Assistant mounted ONCE at app root */}
       <ChouFloatingWidget language={language} />
-      <VoiceAssistant />
 
       {/* 1. Category Switcher Modal */}
       <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>

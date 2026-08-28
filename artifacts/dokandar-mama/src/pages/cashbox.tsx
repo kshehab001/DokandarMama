@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   useGetCashboxState,
   useOpenCashbox,
@@ -15,7 +15,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
-import { Wallet, ArrowDownCircle, ArrowUpCircle, Lock, Unlock, History } from "lucide-react"
+import { useShopTheme } from "@/context/shop-theme-context"
+import { Wallet, ArrowDownCircle, ArrowUpCircle, Lock, Unlock, History, CreditCard, Smartphone, Coins } from "lucide-react"
 
 const movementLabels: Record<string, string> = {
   sale: "ক্যাশ বিক্রি",
@@ -31,9 +32,29 @@ function Money({ value }: { value: number | null | undefined }) {
 export function Cashbox() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const { activeShop } = useShopTheme()
 
   const { data: state, isLoading } = useGetCashboxState()
   const { data: sessions } = useListCashSessions()
+
+  // Digital Payment Summary query
+  const { data: digitalSummary } = useQuery<{
+    since: string
+    totalDigital: number
+    breakdown: Record<string, number>
+    transactionCount: number
+  }>({
+    queryKey: ["cashbox-digital-summary", activeShop?.id],
+    queryFn: async () => {
+      const res = await fetch("/api/cashbox/digital-summary", {
+        headers: {
+          ...(activeShop?.id ? { "x-shop-id": String(activeShop.id) } : {}),
+        },
+      })
+      if (!res.ok) return { since: "", totalDigital: 0, breakdown: {}, transactionCount: 0 }
+      return res.json()
+    },
+  })
 
   const [openingBalance, setOpeningBalance] = useState("")
   const [movementType, setMovementType] = useState<CashMovementInputType>("expense")
@@ -170,6 +191,29 @@ export function Cashbox() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Digital Payments Position */}
+          <Card className="rounded-2xl border border-primary/20 shadow-sm bg-card overflow-hidden">
+            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-primary/10 text-primary">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-muted-foreground">ডিজিটাল পেমেন্ট ব্যালেন্স (শিফট/আজ)</p>
+                  <div className="text-2xl font-black text-primary">
+                    <Money value={digitalSummary?.totalDigital ?? 0} />
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                <span className="px-2.5 py-1 rounded-xl bg-muted/60 border font-medium">বিকাশ: ৳{digitalSummary?.breakdown?.bkash ?? 0}</span>
+                <span className="px-2.5 py-1 rounded-xl bg-muted/60 border font-medium">নগদ: ৳{digitalSummary?.breakdown?.nagad ?? 0}</span>
+                <span className="px-2.5 py-1 rounded-xl bg-muted/60 border font-medium">রকেট: ৳{digitalSummary?.breakdown?.rocket ?? 0}</span>
+                <span className="px-2.5 py-1 rounded-xl bg-muted/60 border font-medium">অন্যান্য: ৳{(digitalSummary?.breakdown?.upay || 0) + (digitalSummary?.breakdown?.card || 0) + (digitalSummary?.breakdown?.qr || 0)}</span>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card className="rounded-2xl border-none shadow-sm">
             <CardHeader>

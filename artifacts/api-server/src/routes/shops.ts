@@ -264,6 +264,10 @@ router.post("/shops/current/members", async (req, res): Promise<void> => {
     return;
   }
 
+  if (parsed.data.role === "admin") {
+    throw new RouteError(403, "অ্যাডমিন বা মালিক রোল যোগ করা যাবে না। শুধুমাত্র ম্যানেজার ও দোকানদার যোগ করা যাবে।");
+  }
+
   const [row] = await db
     .insert(shopUsersTable)
     .values({

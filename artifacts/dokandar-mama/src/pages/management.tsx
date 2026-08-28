@@ -60,87 +60,87 @@ export function ManagementPage() {
     return (activeShop as any)?.enabledPaymentMethods || ["bkash", "nagad"]
   })
 
-  // Team Members State
-  const [members, setMembers] = useState<Array<{ id: number; name: string; emailOrPhone: string; role: "manager" | "shopkeeper" }>>([
-    { id: 1, name: "সেলস সহকারী (ক্যাশিয়ার)", emailOrPhone: "01811223344", role: "shopkeeper" },
-  ])
-  const [newMemberName, setNewMemberName] = useState("")
-  const [newMemberContact, setNewMemberContact] = useState("")
-  const [newMemberRole, setNewMemberRole] = useState<"manager" | "shopkeeper">("shopkeeper")
-
-  const togglePaymentMethod = async (id: string) => {
-    const next = enabledMethods.includes(id)
-      ? enabledMethods.filter((m) => m !== id)
-      : [...enabledMethods, id]
-
-    if (next.length === 0) {
-      toast({ title: "কমপক্ষে একটি পেমেন্ট চ্যানেল সক্রিয় রাখুন", variant: "destructive" })
-      return
-    }
-
-    setEnabledMethods(next)
-    try {
-      await updateShopMutation.mutateAsync({
-        data: {
-          enabledPaymentMethods: next,
-        } as any,
-      })
-      queryClient.invalidateQueries({ queryKey: getGetCurrentShopQueryKey() })
-      toast({ title: "✓ পেমেন্ট মেথড তালিকা আপডেট হয়েছে" })
-    } catch {
-      toast({ title: "সংরক্ষণ করতে সমস্যা হয়েছে", variant: "destructive" })
-    }
-  }
-
-  const handleSaveShopProfile = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!shopName.trim()) {
-      toast({ title: "দোকানের নাম দিন", variant: "destructive" })
-      return
-    }
-
-    try {
-      await updateShopMutation.mutateAsync({
-        data: {
-          name: shopName.trim(),
-          ownerName: ownerName.trim() || undefined,
-          area: area.trim() || undefined,
-          category: category as any,
+  // Team Members Real API
+  const { data: membersData = [], isLoading: isMembersLoading } = useQuery<
+    Array<{ id: number; userId: string; name: string | null; role: "admin" | "manager" | "shopkeeper"; createdAt: string }>
+  >({
+    queryKey: ["shop-members", activeShop?.id],
+    queryFn: async () => {
+      const res = await fetch("/api/shops/current/members", {
+        headers: {
+          ...(activeShop?.id ? { "x-shop-id": String(activeShop.id) } : {}),
         },
       })
-      queryClient.invalidateQueries({ queryKey: getGetCurrentShopQueryKey() })
-      queryClient.invalidateQueries({ queryKey: getListShopsQueryKey() })
-      toast({ title: "✓ দোকানের প্রোফাইল ও সেটিংস সংরক্ষিত হয়েছে!" })
-    } catch {
-      toast({ title: "সংরক্ষণ করতে সমস্যা হয়েছে", variant: "destructive" })
-    }
-  }
+      if (!res.ok) throw new Error("Failed to load members")
+      return res.json()
+    },
+    enabled: !!activeShop?.id,
+  })
 
-  const handleAddMember = (e: React.FormEvent) => {
+  // Filter out admin/owner from staff list since owner is displayed in special top card
+  const staffMembers = membersData.filter((m) => m.role !== "admin")
+
+  const [newMemberName, setNewMemberName] = useState("")
+  const [newMemberUserId, setNewMemberUserId] = useState("")
+  const [newMemberRole, setNewMemberRole] = useState<"manager" | "shopkeeper">("shopkeeper")
+  const [isAddingMember, setIsAddingMember] = useState(false)
+
+  const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newMemberName.trim()) {
       toast({ title: "কর্মচারীর নাম লিখুন", variant: "destructive" })
       return
     }
 
-    setMembers((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        name: newMemberName.trim(),
-        emailOrPhone: newMemberContact.trim() || "N/A",
-        role: newMemberRole,
-      },
-    ])
+    const userIdToUse = newMemberUserId.trim() || `staff_${Date.now()}`
+    setIsAddingMember(true)
+    try {
+      const res = await fetch("/api/shops/current/members", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(activeShop?.id ? { "x-shop-id": String(activeShop.id) } : {}),
+        },
+        body: JSON.stringify({
+          name: newMemberName.trim(),
+          userId: userIdToUse,
+          role: newMemberRole,
+        }),
+      })
 
-    setNewMemberName("")
-    setNewMemberContact("")
-    toast({ title: `✓ নতুন ${newMemberRole === "manager" ? "ম্যানেজার" : "বিক্রেতা"} যুক্ত হয়েছে` })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || "কর্মী যোগ করা যায়নি")
+      }
+
+      queryClient.invalidateQueries({ queryKey: ["shop-members", activeShop?.id] })
+      setNewMemberName("")
+      setNewMemberUserId("")
+      toast({ title: `✓ নতুন ${newMemberRole === "manager" ? "ম্যানেজার" : "বিক্রেতা"} যুক্ত হয়েছে` })
+    } catch (err: any) {
+      toast({ title: err.message || "কর্মী যুক্ত করতে সমস্যা হয়েছে", variant: "destructive" })
+    } finally {
+      setIsAddingMember(false)
+    }
   }
 
-  const handleRemoveMember = (id: number) => {
-    setMembers((prev) => prev.filter((m) => m.id !== id))
-    toast({ title: "কর্মচারী টিম থেকে অপসারিত হয়েছে" })
+  const handleRemoveMember = async (id: number) => {
+    try {
+      const res = await fetch(`/api/shops/current/members/${id}`, {
+        method: "DELETE",
+        headers: {
+          ...(activeShop?.id ? { "x-shop-id": String(activeShop.id) } : {}),
+        },
+      })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.error || "মুছে ফেলা যায়নি")
+      }
+      queryClient.invalidateQueries({ queryKey: ["shop-members", activeShop?.id] })
+      toast({ title: "কর্মী টিম থেকে অপসারিত হয়েছে" })
+    } catch (err: any) {
+      toast({ title: err.message || "মুছে ফেলা সম্ভব হয়নি", variant: "destructive" })
+    }
   }
 
   return (
@@ -253,12 +253,12 @@ export function ManagementPage() {
                 />
               </div>
               <div>
-                <Label className="text-xs font-semibold">মোবাইল / ইমেইল</Label>
+                <Label className="text-xs font-semibold">ইউজার আইডি / ফোন / ইমেইল</Label>
                 <Input
-                  value={newMemberContact}
-                  onChange={(e) => setNewMemberContact(e.target.value)}
-                  placeholder="যেমন: 017xxxxxxxx"
-                  className="h-10 rounded-xl mt-1 bg-background font-mono"
+                  value={newMemberUserId}
+                  onChange={(e) => setNewMemberUserId(e.target.value)}
+                  placeholder="ইউজার আইডি বা মোবাইল নাম্বার"
+                  className="h-10 rounded-xl mt-1 bg-background font-mono text-xs"
                 />
               </div>
               <div>
@@ -274,9 +274,9 @@ export function ManagementPage() {
               </div>
             </div>
             <div className="flex justify-end">
-              <Button type="submit" size="sm" className="rounded-xl font-bold gap-1.5 h-9">
+              <Button type="submit" size="sm" disabled={isAddingMember} className="rounded-xl font-bold gap-1.5 h-9">
                 <Plus className="h-4 w-4" />
-                টিমে যোগ করুন
+                {isAddingMember ? "যোগ হচ্ছে..." : "টিমে যোগ করুন"}
               </Button>
             </div>
           </form>
@@ -284,7 +284,7 @@ export function ManagementPage() {
           {/* Members List */}
           <div className="space-y-2">
             <div className="font-bold text-xs text-muted-foreground uppercase tracking-wider">
-              বর্তমান কর্মী তালিকা ({members.length + 1} জন)
+              বর্তমান কর্মী তালিকা ({staffMembers.length + 1} জন)
             </div>
 
             {/* Owner Row */}
@@ -307,36 +307,44 @@ export function ManagementPage() {
             </div>
 
             {/* Staff Rows */}
-            {members.map((m) => (
-              <div
-                key={m.id}
-                className="p-3.5 rounded-2xl bg-card border border-border flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-muted text-foreground flex items-center justify-center font-bold text-sm">
-                    👤
-                  </div>
-                  <div>
-                    <div className="font-bold text-sm text-foreground flex items-center gap-2">
-                      <span>{m.name}</span>
-                      <Badge variant="outline" className="text-[10px]">
-                        {m.role === "manager" ? "ম্যানেজার" : "বিক্রেতা"}
-                      </Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground font-mono">{m.emailOrPhone}</div>
-                  </div>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-lg"
-                  onClick={() => handleRemoveMember(m.id)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+            {isMembersLoading ? (
+              <div className="p-4 text-center text-xs text-muted-foreground">কর্মী তালিকা লোড হচ্ছে...</div>
+            ) : staffMembers.length === 0 ? (
+              <div className="p-4 text-center text-xs text-muted-foreground border border-dashed rounded-2xl">
+                কোনো অতিরিক্ত কর্মী যুক্ত নেই। ওপরের ফর্ম দিয়ে নতুন কর্মী যোগ করুন।
               </div>
-            ))}
+            ) : (
+              staffMembers.map((m) => (
+                <div
+                  key={m.id}
+                  className="p-3.5 rounded-2xl bg-card border border-border flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-muted text-foreground flex items-center justify-center font-bold text-sm">
+                      👤
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm text-foreground flex items-center gap-2">
+                        <span>{m.name || "অজ্ঞাত কর্মী"}</span>
+                        <Badge variant="outline" className="text-[10px]">
+                          {m.role === "manager" ? "ম্যানেজার" : "বিক্রেতা"}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground font-mono">{m.userId}</div>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-lg"
+                    onClick={() => handleRemoveMember(m.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

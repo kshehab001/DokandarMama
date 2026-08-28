@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
 import { useShopTheme } from "@/context/shop-theme-context"
+import { useChouPresence } from "@/context/chou-presence-context"
 import { useLocation } from "wouter"
 import {
   useGetDashboardOverview,
@@ -81,28 +82,13 @@ export function VoiceAssistant() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const { category } = useShopTheme()
+  const { position, setPose } = useChouPresence()
 
   // Chotu configuration and state
   const [chotuConfig, setChotuConfig] = useState<ChotuConfig>(() => loadSavedChotuConfig())
   const [chotuState, setChotuState] = useState<ChotuState>("idle")
   const [isCustomizerOpen, setIsCustomizerOpen] = useState(false)
   const [isScannerOpen, setIsScannerOpen] = useState(false)
-
-  // Floating Position & Drag State
-  const [position, setPosition] = useState<{ x: number; y: number }>(() => {
-    try {
-      const saved = localStorage.getItem("dokandar_chotu_position")
-      if (saved) return JSON.parse(saved)
-    } catch {}
-    return { x: 24, y: 32 } // Offset from bottom-right in px
-  })
-  const isDraggingRef = useRef(false)
-  const dragStartRef = useRef<{ clientX: number; clientY: number; posX: number; posY: number }>({
-    clientX: 0,
-    clientY: 0,
-    posX: 24,
-    posY: 32,
-  })
 
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)

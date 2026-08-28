@@ -392,87 +392,85 @@ export function Billing() {
                 </Button>
               </div>
 
-              {paymentMethod === 'digital' && (
-                <div className="space-y-3 p-3 rounded-2xl bg-muted/40 border border-border/80 animate-in fade-in slide-in-from-top-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">পেমেন্ট মেথড সিলেক্ট করুন</Label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {availableDigitalProviders.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => setDigitalProvider(p.id)}
-                          className={cn(
-                            "h-9 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center border",
-                            digitalProvider === p.id
-                              ? `${p.bg} shadow-sm border-transparent scale-[1.02]`
-                              : "bg-background text-muted-foreground border-border hover:bg-muted"
-                          )}
-                        >
-                          {p.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+              {/* Customer Selector (Available for all payment methods, mandatory for baki/mixed) */}
+              <div className="space-y-1.5 p-3 rounded-2xl bg-muted/30 border border-border/60">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold flex items-center gap-1">
+                    <span>কাস্টমার</span>
+                    <span className="text-[10px] text-muted-foreground font-normal">
+                      {(paymentMethod === 'baki' || paymentMethod === 'mixed') ? "(আবশ্যক)" : "(ঐচ্ছিক)"}
+                    </span>
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-[11px] font-bold text-primary gap-1 hover:bg-primary/10"
+                    onClick={() => setIsNewCustomerDialogOpen(true)}
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>+ নতুন কাস্টমার</span>
+                  </Button>
+                </div>
+                <select 
+                  className="flex h-10 w-full items-center justify-between rounded-xl border border-input bg-background px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-ring"
+                  value={selectedCustomerId || ""}
+                  onChange={e => setSelectedCustomerId(Number(e.target.value) || null)}
+                >
+                  <option value="">কাস্টমার সিলেক্ট করুন (সাধারণ গ্রাহক)...</option>
+                  {customers?.map((c: any) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} {c.phone ? `(${c.phone})` : ''} — বাকি: ৳{c.bakiBalance}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                  <div className="space-y-1">
-                    <Label className="text-xs">ট্রানজেকশন আইডি / ফোন নাম্বার (ঐচ্ছিক)</Label>
-                    <Input
-                      value={digitalTrxId}
-                      onChange={e => setDigitalTrxId(e.target.value)}
-                      placeholder="ঐচ্ছিক (না দিলেও চলবে)"
-                      className="h-10 text-sm font-mono rounded-xl bg-background"
-                    />
+              {/* Payment Method Specific Options */}
+              {paymentMethod === 'digital' && (
+                <div className="space-y-2 p-3 rounded-2xl bg-muted/40 border border-border/80 animate-in fade-in slide-in-from-top-2">
+                  <Label className="text-xs font-semibold">পেমেন্ট চ্যানেল সিলেক্ট করুন</Label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {availableDigitalProviders.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setDigitalProvider(p.id)}
+                        className={cn(
+                          "h-10 px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center border",
+                          digitalProvider === p.id
+                            ? `${p.bg} shadow-sm border-transparent scale-[1.02]`
+                            : "bg-background text-muted-foreground border-border hover:bg-muted"
+                        )}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {(paymentMethod === 'baki' || paymentMethod === 'mixed') && (
-                <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-xs font-semibold">কাস্টমার</Label>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 px-2 text-xs font-bold text-primary gap-1 hover:bg-primary/10"
-                        onClick={() => setIsNewCustomerDialogOpen(true)}
-                      >
-                        <UserPlus className="w-3.5 h-3.5" />
-                        <span>+ নতুন কাস্টমার</span>
-                      </Button>
-                    </div>
-                    <select 
-                      className="flex h-12 w-full items-center justify-between rounded-lg border border-input bg-background px-4 py-2 text-base outline-none focus:ring-2 focus:ring-ring"
-                      value={selectedCustomerId || ""}
-                      onChange={e => setSelectedCustomerId(Number(e.target.value) || null)}
-                    >
-                      <option value="">কাস্টমার সিলেক্ট করুন...</option>
-                      {customers?.map((c: any) => (
-                        <option key={c.id} value={c.id}>{c.name} ({c.phone || 'No phone'}) - বাকি: ৳{c.bakiBalance}</option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  {paymentMethod === 'mixed' && (
-                    <div className="space-y-1">
-                      <Label>জমা দেওয়া পরিমাণ (৳)</Label>
-                      <Input 
-                        type="number" 
-                        value={paidAmountStr} 
-                        onChange={e => setPaidAmountStr(e.target.value)} 
-                        placeholder="কতো টাকা দিলো?" 
-                        className="h-12 rounded-xl text-lg font-bold"
-                      />
-                    </div>
+              {paymentMethod === 'mixed' && (
+                <div className="space-y-1.5 p-3 rounded-2xl bg-muted/40 border border-border/80 animate-in fade-in slide-in-from-top-2">
+                  <Label className="text-xs font-semibold">জমা দেওয়া পরিমাণ (৳)</Label>
+                  <Input 
+                    type="number" 
+                    value={paidAmountStr} 
+                    onChange={e => setPaidAmountStr(e.target.value)} 
+                    placeholder="কতো টাকা দিলো?" 
+                    className="h-11 rounded-xl text-base font-bold"
+                  />
+                  {Number(paidAmountStr) > 0 && Number(paidAmountStr) < total && (
+                    <p className="text-[11px] font-medium text-amber-600">
+                      বাকি থাকবে: ৳{total - Number(paidAmountStr)}
+                    </p>
                   )}
                 </div>
               )}
             </div>
 
             <Button 
-              className="w-full h-14 text-lg rounded-xl font-bold" 
+              className="w-full h-14 text-lg rounded-xl font-bold shadow-md" 
               size="lg"
               disabled={cart.length === 0 || createSale.isPending}
               onClick={handleCompleteClick}

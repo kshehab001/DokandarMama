@@ -34,8 +34,8 @@ export interface ChotuConfig {
 
 export const DEFAULT_CHOTU_CONFIG: ChotuConfig = {
   outfit: "traditional",
-  capColor: "#2563eb", // Dokandar Blue
-  vestColor: "#1d4ed8",
+  capColor: "#15803d", // Bangladeshi Green
+  vestColor: "#2563eb", // Royal Blue Vest
   personality: "friendly",
   language: "bn",
   size: "medium",

@@ -424,6 +424,27 @@ export function SellerBillDialog({
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">উৎপাদন তারিখ (MFG)</Label>
+                      <Input
+                        type="date"
+                        value={item.mfgDate || ""}
+                        onChange={(e) => handleItemChange(idx, "mfgDate", e.target.value)}
+                        className="h-8 text-xs rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-muted-foreground">মেয়াদ (EXP)</Label>
+                      <Input
+                        type="date"
+                        value={item.expiryDate || ""}
+                        onChange={(e) => handleItemChange(idx, "expiryDate", e.target.value)}
+                        className="h-8 text-xs rounded-lg"
+                      />
+                    </div>
+                  </div>
+
                   {item.matchedProductId && (
                     <div className="flex items-center gap-1 text-[11px] text-emerald-600 font-semibold pt-0.5">
                       <CheckCircle2 className="h-3 w-3" />

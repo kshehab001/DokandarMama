@@ -23,8 +23,8 @@ export function ChotuAvatar({
   interactive = true,
   showAura = true,
 }: ChotuAvatarProps) {
-  const capColor = config.capColor || "#2563eb"
-  const vestColor = config.vestColor || "#1d4ed8"
+  const capColor = config.capColor || "#15803d"
+  const vestColor = config.vestColor || "#2563eb"
   const outfit = config.outfit || "traditional"
   const size = config.size || "medium"
 

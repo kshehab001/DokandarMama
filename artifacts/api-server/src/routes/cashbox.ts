@@ -5,6 +5,7 @@ import {
   CASH_MOVEMENT_TYPES,
   cashMovementsTable,
   cashSessionsTable,
+  salesTable,
   db,
 } from "@workspace/db";
 import { RouteError, toNum } from "../lib/numeric";
@@ -220,6 +221,55 @@ router.get("/cashbox/sessions", async (req, res): Promise<void> => {
     .limit(60);
 
   res.json(rows.map(serializeSession));
+});
+
+/** Digital payment balances breakdown: sums digital sales by provider for open session (or today). */
+router.get("/cashbox/digital-summary", async (req, res): Promise<void> => {
+  const { shopId } = requireShop(req);
+  const session = await findOpenSession(shopId);
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const since = session?.openedAt ?? startOfDay;
+
+  const digitalSales = await db
+    .select()
+    .from(salesTable)
+    .where(
+      and(
+        eq(salesTable.shopId, shopId),
+        eq(salesTable.paymentMethod, "digital"),
+        gte(salesTable.createdAt, since),
+      ),
+    );
+
+  const breakdown: Record<string, number> = {
+    bkash: 0,
+    nagad: 0,
+    rocket: 0,
+    upay: 0,
+    card: 0,
+    qr: 0,
+    other: 0,
+  };
+
+  let totalDigital = 0;
+  for (const s of digitalSales) {
+    const paid = toNum(s.paidAmount);
+    totalDigital += paid;
+    const provider = (s.digitalProvider || "other").toLowerCase();
+    if (provider in breakdown) {
+      breakdown[provider] += paid;
+    } else {
+      breakdown.other += paid;
+    }
+  }
+
+  res.json({
+    since: since.toISOString(),
+    totalDigital,
+    breakdown,
+    transactionCount: digitalSales.length,
+  });
 });
 
 export default router;

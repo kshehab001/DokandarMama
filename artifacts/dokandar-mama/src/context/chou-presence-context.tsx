@@ -99,13 +99,7 @@ export function ChouPresenceProvider({ children, ownerName }: ChouProviderProps)
   const [isMinimized, setMinimized] = useState(() => {
     try { return localStorage.getItem(MINIMIZED_KEY) === "true" } catch { return false }
   })
-  const [position, setPositionState] = useState<{ x: number; y: number }>(() => {
-    try {
-      const s = localStorage.getItem(POSITION_KEY)
-      if (s) return JSON.parse(s)
-    } catch {}
-    return { x: 16, y: 80 }
-  })
+  const [position, setPositionState] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
 
   const isOnline = typeof navigator !== "undefined" ? navigator.onLine : true
   const [offline, setOffline] = useState(!isOnline)
