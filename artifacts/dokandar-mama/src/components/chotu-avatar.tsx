@@ -1,4 +1,4 @@
-﻿import React, { useId, useState, useEffect } from "react"
+import React, { useId, useState, useEffect } from "react"
 import { cn } from "@/lib/utils"
 import {
   type ChotuConfig,
@@ -21,7 +21,7 @@ export interface ChotuAvatarProps {
 const SPRITE_POSES = new Set(["idle","listening","thinking","speaking","success","billing"])
 
 function getSpriteUrl(resolvedPose: string): string | null {
-  if (SPRITE_POSES.has(resolvedPose)) return `/assets/chotu/webp/${resolvedPose}.jpg`
+  if (SPRITE_POSES.has(resolvedPose)) return `/assets/chotu/webp/${resolvedPose}.webp`
   return null
 }
 
