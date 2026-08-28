@@ -4,13 +4,17 @@ import {
   useListProducts, 
   useListCustomers,
   useCreateSale,
+  useCreateCustomer,
+  getListCustomersQueryKey,
   getProductByBarcode
 } from "@workspace/api-client-react"
+import { useQueryClient } from "@tanstack/react-query"
+import { useShopTheme } from "@/context/shop-theme-context"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Search, Plus, Minus, Trash2, Camera, Package, Banknote, ShoppingCart } from "lucide-react"
+import { Search, Plus, Minus, Trash2, Camera, Package, Banknote, ShoppingCart, UserPlus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { SaleItemInput, SaleInputPaymentMethod } from "@workspace/api-client-react"
@@ -70,9 +74,54 @@ export function Billing() {
     return () => window.removeEventListener("chotu:action:clear_cart", handler)
   }, [speak])
 
+  const { activeShop } = useShopTheme()
+  const queryClient = useQueryClient()
+  const createCustomer = useCreateCustomer()
+
+  const [isNewCustomerDialogOpen, setIsNewCustomerDialogOpen] = useState(false)
+  const [newCustomerName, setNewCustomerName] = useState("")
+  const [newCustomerPhone, setNewCustomerPhone] = useState("")
+
+  // Available digital payment methods enabled by shop owner
+  const enabledMethods: string[] = (activeShop as any)?.enabledPaymentMethods || ["bkash", "nagad"]
+  const allDigitalProviders = [
+    { id: 'bkash', label: 'বিকাশ', bg: 'bg-[#d12053] text-white hover:bg-[#b01742]' },
+    { id: 'nagad', label: 'নগদ', bg: 'bg-[#f7941d] text-white hover:bg-[#d67e15]' },
+    { id: 'rocket', label: 'রকেট', bg: 'bg-[#8c3494] text-white hover:bg-[#722979]' },
+    { id: 'upay', label: 'উপায়', bg: 'bg-[#ffc800] text-black hover:bg-[#e0b000]' },
+    { id: 'card', label: 'কার্ড/POS', bg: 'bg-blue-600 text-white hover:bg-blue-700' },
+    { id: 'qr', label: 'বাংলা QR', bg: 'bg-emerald-600 text-white hover:bg-emerald-700' },
+  ]
+  const availableDigitalProviders = allDigitalProviders.filter((p) => enabledMethods.includes(p.id))
+
   // Derived
   const subtotal = cart.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0)
   const total = subtotal // add discount/tax later if needed
+
+  const handleCreateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newCustomerName.trim()) {
+      toast({ title: "কাস্টমারের নাম লিখুন", variant: "destructive" })
+      return
+    }
+
+    try {
+      const created = await createCustomer.mutateAsync({
+        data: {
+          name: newCustomerName.trim(),
+          phone: newCustomerPhone.trim() || undefined,
+        },
+      })
+      queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey() })
+      setSelectedCustomerId(created.id)
+      setIsNewCustomerDialogOpen(false)
+      setNewCustomerName("")
+      setNewCustomerPhone("")
+      toast({ title: `✓ কাস্টমার "${created.name}" সফলভাবে যুক্ত ও নির্বাচিত হয়েছে!` })
+    } catch (err: any) {
+      toast({ title: "কাস্টমার তৈরি করতে সমস্যা হয়েছে", variant: "destructive" })
+    }
+  }
   
   const handleAddToCart = (product: any) => {
     setCart(prev => {
@@ -157,7 +206,7 @@ export function Billing() {
         digitalTrxId: paymentMethod === 'digital' ? (digitalTrxId || undefined) : undefined,
       } as any
     }, {
-      onSuccess: (sale) => {
+      onSuccess: (sale: any) => {
         toast({ title: "বিল সফলভাবে তৈরি হয়েছে!" })
         setIsCashDialogOpen(false)
         // Chotu celebrates — pose holds for 4s before route changes
@@ -186,6 +235,11 @@ export function Billing() {
       // before the sale is finalized.
       setCashReceivedStr(String(total))
       setIsCashDialogOpen(true)
+      return
+    }
+
+    if (paymentMethod === 'digital') {
+      submitSale(total)
       return
     }
 
@@ -220,7 +274,7 @@ export function Billing() {
           <CardContent className="p-4 pt-4">
             {search.length > 0 ? (
               <div className="space-y-2 max-h-[30vh] overflow-y-auto">
-                {products?.map(p => (
+                {products?.map((p: any) => (
                   <div key={p.id} className="flex items-center justify-between p-3 border rounded-xl hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => handleAddToCart(p)}>
                     <div>
                       <div className="font-semibold text-lg">{p.name}</div>
@@ -343,14 +397,7 @@ export function Billing() {
                   <div className="space-y-1.5">
                     <Label className="text-xs font-semibold">পেমেন্ট মেথড সিলেক্ট করুন</Label>
                     <div className="grid grid-cols-3 gap-1.5">
-                      {[
-                        { id: 'bkash', label: 'বিকাশ', bg: 'bg-[#d12053] text-white hover:bg-[#b01742]' },
-                        { id: 'nagad', label: 'নগদ', bg: 'bg-[#f7941d] text-white hover:bg-[#d67e15]' },
-                        { id: 'rocket', label: 'রকেট', bg: 'bg-[#8c3494] text-white hover:bg-[#722979]' },
-                        { id: 'upay', label: 'উপায়', bg: 'bg-[#ffc800] text-black hover:bg-[#e0b000]' },
-                        { id: 'card', label: 'কার্ড/POS', bg: 'bg-blue-600 text-white hover:bg-blue-700' },
-                        { id: 'qr', label: 'বাংলা QR', bg: 'bg-emerald-600 text-white hover:bg-emerald-700' },
-                      ].map((p) => (
+                      {availableDigitalProviders.map((p) => (
                         <button
                           key={p.id}
                           type="button"
@@ -373,7 +420,7 @@ export function Billing() {
                     <Input
                       value={digitalTrxId}
                       onChange={e => setDigitalTrxId(e.target.value)}
-                      placeholder="যেমন: 8N7A6D..."
+                      placeholder="ঐচ্ছিক (না দিলেও চলবে)"
                       className="h-10 text-sm font-mono rounded-xl bg-background"
                     />
                   </div>
@@ -383,14 +430,26 @@ export function Billing() {
               {(paymentMethod === 'baki' || paymentMethod === 'mixed') && (
                 <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
                   <div className="space-y-1">
-                    <Label>কাস্টমার</Label>
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">কাস্টমার</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-xs font-bold text-primary gap-1 hover:bg-primary/10"
+                        onClick={() => setIsNewCustomerDialogOpen(true)}
+                      >
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>+ নতুন কাস্টমার</span>
+                      </Button>
+                    </div>
                     <select 
                       className="flex h-12 w-full items-center justify-between rounded-lg border border-input bg-background px-4 py-2 text-base outline-none focus:ring-2 focus:ring-ring"
                       value={selectedCustomerId || ""}
                       onChange={e => setSelectedCustomerId(Number(e.target.value) || null)}
                     >
                       <option value="">কাস্টমার সিলেক্ট করুন...</option>
-                      {customers?.map(c => (
+                      {customers?.map((c: any) => (
                         <option key={c.id} value={c.id}>{c.name} ({c.phone || 'No phone'}) - বাকি: ৳{c.bakiBalance}</option>
                       ))}
                     </select>
@@ -497,6 +556,61 @@ export function Billing() {
               {createSale.isPending ? "বিল হচ্ছে..." : "সম্পন্ন করুন"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Inline Quick Add Customer Dialog */}
+      <Dialog open={isNewCustomerDialogOpen} onOpenChange={setIsNewCustomerDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl">
+          <form onSubmit={handleCreateCustomer}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <UserPlus className="h-5 w-5 text-primary" />
+                নতুন কাস্টমার যোগ করুন
+              </DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="cust-name">কাস্টমারের নাম *</Label>
+                <Input
+                  id="cust-name"
+                  value={newCustomerName}
+                  onChange={(e) => setNewCustomerName(e.target.value)}
+                  placeholder="যেমন: রহিম শেখ"
+                  className="h-11 rounded-xl"
+                  autoFocus
+                  required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cust-phone">মোবাইল নাম্বার (ঐচ্ছিক)</Label>
+                <Input
+                  id="cust-phone"
+                  value={newCustomerPhone}
+                  onChange={(e) => setNewCustomerPhone(e.target.value)}
+                  placeholder="যেমন: 01711223344"
+                  className="h-11 rounded-xl font-mono"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-xl"
+                onClick={() => setIsNewCustomerDialogOpen(false)}
+              >
+                বাতিল
+              </Button>
+              <Button
+                type="submit"
+                className="rounded-xl font-bold"
+                disabled={createCustomer.isPending || !newCustomerName.trim()}
+              >
+                {createCustomer.isPending ? "সংরক্ষণ হচ্ছে..." : "যোগ করুন ও সিলেক্ট করুন"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

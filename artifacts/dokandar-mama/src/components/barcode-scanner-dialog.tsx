@@ -77,8 +77,48 @@ export function BarcodeScannerDialog({
 
     const reader = new BrowserMultiFormatReader(hints)
 
-    // Progressive fallback constraints
+    // Enumerate devices to pick the best rear/back camera on Android/iPhone
+    let rearDeviceId: string | undefined = undefined
+    try {
+      if (navigator?.mediaDevices?.enumerateDevices) {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const videoDevices = devices.filter((d) => d.kind === "videoinput")
+        // Look for rear/back camera in labels
+        const backCamera = videoDevices.find(
+          (d) =>
+            d.label.toLowerCase().includes("back") ||
+            d.label.toLowerCase().includes("rear") ||
+            d.label.toLowerCase().includes("environment") ||
+            d.label.toLowerCase().includes("0")
+        )
+        if (backCamera?.deviceId && facing === "environment") {
+          rearDeviceId = backCamera.deviceId
+        }
+      }
+    } catch {
+      // Permission or enumeration fallback
+    }
+
+    // Progressive fallback constraints strongly prioritizing primary rear camera
     const constraintList: MediaStreamConstraints[] = [
+      ...(rearDeviceId && facing === "environment"
+        ? [
+            {
+              video: {
+                deviceId: { exact: rearDeviceId },
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+              },
+            },
+          ]
+        : []),
+      {
+        video: {
+          facingMode: { exact: facing },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+      },
       {
         video: {
           facingMode: { ideal: facing },

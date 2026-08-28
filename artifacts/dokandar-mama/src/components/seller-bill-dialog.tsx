@@ -37,6 +37,8 @@ export interface ExtractedBillItem {
   sellPrice?: number
   unit: string
   category: string
+  mfgDate?: string
+  expiryDate?: string
   matchedProductId?: number | null
 }
 
@@ -167,53 +169,39 @@ export function SellerBillDialog({
         }
       }
 
-      // Default sample lines if image is a placeholder or OCR returns empty
-      if (!rawTextResult || rawTextResult.length < 5) {
-        rawTextResult = `সয়াবিন তেল (১ লিটার) 24 175 4200\nমিনিকেট চাল 50 70 3500\nলাক্স সাবান 36 50 1800`
-      }
+      // If text extracted from OCR
+      const parsedItems = extractItemsFromText(rawTextResult)
 
-      // Send to backend purchases endpoint
-      try {
-        const invoiceRes = await createInvoice.mutateAsync({
-          data: {
-            rawText: rawTextResult,
-            supplierName: supplierName || "সাপ্লায়ার মেমো",
-            imageUrl: base64Data.length < 100000 ? base64Data : undefined,
-          },
-        })
-        setInvoiceId(invoiceRes.id)
-        if (invoiceRes.supplierName) setSupplierName(invoiceRes.supplierName)
-      } catch {
-        // Fallback local invoice id
+      // Send to backend purchases endpoint if text exists
+      if (rawTextResult.trim()) {
+        try {
+          const invoiceRes = await createInvoice.mutateAsync({
+            data: {
+              rawText: rawTextResult,
+              supplierName: supplierName || "সাপ্লায়ার মেমো",
+              imageUrl: base64Data.length < 100000 ? base64Data : undefined,
+            },
+          })
+          setInvoiceId(invoiceRes.id)
+          if (invoiceRes.supplierName) setSupplierName(invoiceRes.supplierName)
+        } catch {
+          setInvoiceId(Date.now())
+        }
+      } else {
         setInvoiceId(Date.now())
       }
 
-      const parsedItems = extractItemsFromText(rawTextResult)
-      setItems(
-        parsedItems.length > 0
-          ? parsedItems
-          : [
-              {
-                name: "সয়াবিন তেল (১ লিটার)",
-                quantity: 24,
-                unitCost: 175,
-                sellPrice: 190,
-                unit: "বোতল",
-                category: "তেল ও ঘি",
-              },
-              {
-                name: "মিনিকেট চাল",
-                quantity: 50,
-                unitCost: 70,
-                sellPrice: 78,
-                unit: "কেজি",
-                category: "চাল ও ডাল",
-              },
-            ]
-      )
-
+      setItems(parsedItems)
       setStep("review")
-      toast({ title: "বিলের পণ্যগুলো সফলভাবে রিড করা হয়েছে", description: "যাচাই করে কনফার্ম করুন" })
+
+      if (parsedItems.length > 0) {
+        toast({ title: `✓ ${parsedItems.length} টি পণ্য বিল থেকে পড়া হয়েছে`, description: "যাচাই করে কনফার্ম করুন" })
+      } else {
+        toast({
+          title: "বিল থেকে পণ্যের তালিকা স্পষ্টভাবে পড়া যায়নি",
+          description: "নিচের '+ পণ্য যোগ করুন' বাটনে ক্লিক করে তথ্য বসিয়ে নিন",
+        })
+      }
     } catch (err) {
       console.error("Seller bill processing failed", err)
       toast({

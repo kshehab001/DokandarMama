@@ -36,12 +36,13 @@ router.get("/dashboard/overview", async (req, res): Promise<void> => {
     db
       .select()
       .from(salesTable)
-      .where(and(eq(salesTable.shopId, shopId), gte(salesTable.createdAt, todayStart))),
+      .where(eq(salesTable.shopId, shopId)),
     db.select().from(customersTable).where(eq(customersTable.shopId, shopId)),
     db.select().from(productsTable).where(eq(productsTable.shopId, shopId)),
   ]);
 
-  const todaySalesTotal = allSales.reduce((sum, s) => sum + toNum(s.total), 0);
+  const todaySales = allSales.filter((s) => s.createdAt >= todayStart);
+  const todaySalesTotal = todaySales.reduce((sum, s) => sum + toNum(s.total), 0);
   const totalDue = allCustomers.reduce(
     (sum, c) => sum + toNum(c.bakiBalance),
     0,
@@ -50,12 +51,56 @@ router.get("/dashboard/overview", async (req, res): Promise<void> => {
     (p) => toNum(p.stock) <= toNum(p.lowStockThreshold),
   ).length;
 
+  // Digital breakdown calculation across all sales
+  const digitalBreakdown: Record<string, number> = {
+    bkash: 0,
+    nagad: 0,
+    rocket: 0,
+    upay: 0,
+    card: 0,
+    qr: 0,
+    other: 0,
+  };
+
+  let totalDigital = 0;
+  let totalCash = 0;
+
+  for (const s of allSales) {
+    const paid = toNum(s.paidAmount);
+    if (s.paymentMethod === "digital") {
+      totalDigital += paid;
+      const provider = (s.digitalProvider || "other").toLowerCase();
+      if (provider in digitalBreakdown) {
+        digitalBreakdown[provider] += paid;
+      } else {
+        digitalBreakdown.other += paid;
+      }
+    } else if (s.paymentMethod === "cash" || s.paymentMethod === "mixed") {
+      totalCash += paid;
+    }
+  }
+
+  // Today specific breakdown
+  let todayCash = 0;
+  let todayDigital = 0;
+  for (const s of todaySales) {
+    const paid = toNum(s.paidAmount);
+    if (s.paymentMethod === "digital") todayDigital += paid;
+    else if (s.paymentMethod === "cash" || s.paymentMethod === "mixed") todayCash += paid;
+  }
+
   res.json({
     todaySalesTotal,
-    todayTransactionCount: allSales.length,
+    todayTransactionCount: todaySales.length,
+    todayCash,
+    todayDigital,
     totalDue,
     lowStockCount,
     customerCount: allCustomers.length,
+    cashBalance: totalCash,
+    digitalBalance: totalDigital,
+    digitalBreakdown,
+    totalCurrentBalance: totalCash + totalDigital,
   });
 });
 
@@ -214,6 +259,61 @@ router.get("/suggestions/restock", async (req, res): Promise<void> => {
     .sort((a, b) => a.stock - b.stock);
 
   res.json(suggestions);
+});
+
+router.get("/reports/export", async (req, res): Promise<void> => {
+  const { shopId } = requireRole(req, "manager");
+  const type = (req.query.type as string) || "all";
+  const range = (req.query.range as "today" | "week" | "month" | "all") || "month";
+
+  const [sales, products, customers] = await Promise.all([
+    db
+      .select()
+      .from(salesTable)
+      .where(
+        range === "all"
+          ? eq(salesTable.shopId, shopId)
+          : and(eq(salesTable.shopId, shopId), gte(salesTable.createdAt, rangeStart(range))),
+      )
+      .orderBy(salesTable.createdAt),
+    db.select().from(productsTable).where(eq(productsTable.shopId, shopId)),
+    db.select().from(customersTable).where(eq(customersTable.shopId, shopId)),
+  ]);
+
+  res.json({
+    shopId,
+    exportedAt: new Date().toISOString(),
+    range,
+    sales: sales.map((s) => ({
+      id: s.id,
+      date: s.createdAt.toISOString(),
+      total: toNum(s.total),
+      paidAmount: toNum(s.paidAmount),
+      dueAmount: toNum(s.dueAmount),
+      paymentMethod: s.paymentMethod,
+      digitalProvider: s.digitalProvider,
+      digitalTrxId: s.digitalTrxId,
+      customerName: s.customerName,
+    })),
+    products: products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      barcode: p.barcode,
+      category: p.category,
+      price: toNum(p.price),
+      costPrice: p.costPrice ? toNum(p.costPrice) : null,
+      stock: toNum(p.stock),
+      unit: p.unit,
+      mfgDate: p.mfgDate ? p.mfgDate.toISOString() : null,
+      expiryDate: p.expiryDate ? p.expiryDate.toISOString() : null,
+    })),
+    customers: customers.map((c) => ({
+      id: c.id,
+      name: c.name,
+      phone: c.phone,
+      bakiBalance: toNum(c.bakiBalance),
+    })),
+  });
 });
 
 export default router;

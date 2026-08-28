@@ -32,6 +32,10 @@ function serializeProduct(
     stock: toNum(row.stock),
     lowStockThreshold: toNum(row.lowStockThreshold),
     isPriceVariable: row.isPriceVariable,
+    mfgDate: row.mfgDate ? row.mfgDate.toISOString() : null,
+    expiryDate: row.expiryDate ? row.expiryDate.toISOString() : null,
+    batchNumber: row.batchNumber,
+    brand: row.brand,
     updatedAt: row.updatedAt.toISOString(),
   };
 }
@@ -97,6 +101,10 @@ router.post("/products", async (req, res): Promise<void> => {
           ? undefined
           : String(parsed.data.lowStockThreshold),
       isPriceVariable: parsed.data.isPriceVariable ?? false,
+      mfgDate: (parsed.data as any).mfgDate ? new Date((parsed.data as any).mfgDate) : null,
+      expiryDate: (parsed.data as any).expiryDate ? new Date((parsed.data as any).expiryDate) : null,
+      batchNumber: (parsed.data as any).batchNumber ?? null,
+      brand: (parsed.data as any).brand ?? null,
     })
     .returning();
 
@@ -182,6 +190,14 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
     updates.lowStockThreshold = String(data.lowStockThreshold);
   if (data.isPriceVariable !== undefined)
     updates.isPriceVariable = data.isPriceVariable;
+  if ((data as any).mfgDate !== undefined)
+    updates.mfgDate = (data as any).mfgDate ? new Date((data as any).mfgDate) : null;
+  if ((data as any).expiryDate !== undefined)
+    updates.expiryDate = (data as any).expiryDate ? new Date((data as any).expiryDate) : null;
+  if ((data as any).batchNumber !== undefined)
+    updates.batchNumber = (data as any).batchNumber;
+  if ((data as any).brand !== undefined)
+    updates.brand = (data as any).brand;
 
   const [row] = await db
     .update(productsTable)

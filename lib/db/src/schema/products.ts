@@ -39,6 +39,7 @@ export const productsTable = pgTable("products", {
     .default("5"),
   isPriceVariable: boolean("is_price_variable").notNull().default(false),
   // Category-specific attributes
+  mfgDate: timestamp("mfg_date", { withTimezone: true }),
   expiryDate: timestamp("expiry_date", { withTimezone: true }),
   batchNumber: text("batch_number"),
   brand: text("brand"),

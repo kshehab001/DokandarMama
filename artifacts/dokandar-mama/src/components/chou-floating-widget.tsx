@@ -164,7 +164,7 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
   const { data: products } = useListProducts()
   useEffect(() => {
     if (location.includes("/inventory") && products) {
-      const lowCount = products.filter((p) => Number(p.stock) <= Number(p.lowStockThreshold ?? 5)).length
+      const lowCount = products.filter((p: any) => Number(p.stock) <= Number(p.lowStockThreshold ?? 5)).length
       if (lowCount > 0) {
         setPose("low_stock", "concerned")
         speak(
@@ -369,6 +369,7 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
                 if (onMicClick) {
                   onMicClick()
                 } else {
+                  window.dispatchEvent(new CustomEvent("chotu:open_panel"))
                   window.dispatchEvent(new CustomEvent("chotu:toggle_voice"))
                 }
               }}

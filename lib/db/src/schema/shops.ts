@@ -64,6 +64,7 @@ export const shopsTable = pgTable("shops", {
     .notNull()
     .default("basic"),
   cashboxAddon: boolean("cashbox_addon").notNull().default(false),
+  enabledPaymentMethods: text("enabled_payment_methods").array(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -48,7 +48,7 @@ export function Inventory() {
     }
   }, [canManageProducts])
   
-  const [formData, setFormData] = useState<ProductInput>({
+  const [formData, setFormData] = useState<ProductInput & { mfgDate?: string; expiryDate?: string }>({
     name: "",
     barcode: "",
     category: "",
@@ -57,7 +57,9 @@ export function Inventory() {
     costPrice: 0,
     stock: 0,
     lowStockThreshold: 5,
-    isPriceVariable: false
+    isPriceVariable: false,
+    mfgDate: "",
+    expiryDate: ""
   })
 
   const createProduct = useCreateProduct()
@@ -85,7 +87,9 @@ export function Inventory() {
         costPrice: product.costPrice || 0,
         stock: product.stock,
         lowStockThreshold: product.lowStockThreshold,
-        isPriceVariable: product.isPriceVariable
+        isPriceVariable: product.isPriceVariable,
+        mfgDate: product.mfgDate ? product.mfgDate.split("T")[0] : "",
+        expiryDate: product.expiryDate ? product.expiryDate.split("T")[0] : ""
       })
     } else {
       setEditingId(null)
@@ -98,7 +102,9 @@ export function Inventory() {
         costPrice: 0,
         stock: 0,
         lowStockThreshold: 5,
-        isPriceVariable: false
+        isPriceVariable: false,
+        mfgDate: "",
+        expiryDate: ""
       })
     }
     setIsFormOpen(true)
@@ -173,7 +179,7 @@ export function Inventory() {
     setIsImporting(true)
     setImportProgress(0)
     const categoryCatalog = getStarterCatalogForCategory(categoryId)
-    const existingNames = new Set((products ?? []).map((p) => p.name.trim().toLowerCase()))
+    const existingNames = new Set((products ?? []).map((p: any) => p.name.trim().toLowerCase()))
     const toImport = categoryCatalog.filter((item) => !existingNames.has(item.name.trim().toLowerCase()))
 
     let successCount = 0
@@ -275,7 +281,7 @@ export function Inventory() {
                 ) : products?.length === 0 ? (
                   <tr><td colSpan={4} className="p-8 text-center text-muted-foreground">কোন পণ্য পাওয়া যায়নি।</td></tr>
                 ) : (
-                  products?.map((product) => (
+                  products?.map((product: any) => (
                     <tr key={product.id} className="hover:bg-muted/30 transition-colors text-base">
                       <td className="px-6 py-4">
                         <div className="font-semibold text-foreground">{product.name}</div>
@@ -384,6 +390,27 @@ export function Inventory() {
                 <div className="text-xs text-muted-foreground">মাছ/সবজি বা দরদামের পণ্যের জন্য</div>
               </div>
             </label>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>উৎপাদন তারিখ (MFG)</Label>
+                <Input
+                  type="date"
+                  value={formData.mfgDate || ""}
+                  onChange={(e) => setFormData({ ...formData, mfgDate: e.target.value })}
+                  className="h-12"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>মেয়াদোত্তীর্ণ তারিখ (EXP)</Label>
+                <Input
+                  type="date"
+                  value={formData.expiryDate || ""}
+                  onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                  className="h-12"
+                />
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

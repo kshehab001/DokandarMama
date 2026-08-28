@@ -26,6 +26,7 @@ const CreateShopBody = z.object({
   category: z.enum(SHOP_CATEGORIES),
   ownerName: z.string().trim().max(120).optional(),
   area: z.string().trim().max(120).optional(),
+  enabledPaymentMethods: z.array(z.string()).optional(),
   /** Present when the owner is registering a chain / super shop. */
   organizationName: z.string().trim().max(120).optional(),
 });
@@ -37,6 +38,7 @@ const UpdateShopBody = z.object({
   area: z.string().trim().max(120).optional(),
   subscriptionPlan: z.enum(SUBSCRIPTION_PLANS).optional(),
   cashboxAddon: z.boolean().optional(),
+  enabledPaymentMethods: z.array(z.string()).optional(),
 });
 
 const AddMemberBody = z.object({
@@ -55,6 +57,7 @@ function serializeShop(row: typeof shopsTable.$inferSelect) {
     area: row.area,
     subscriptionPlan: row.subscriptionPlan,
     cashboxAddon: row.cashboxAddon,
+    enabledPaymentMethods: row.enabledPaymentMethods || ["bkash", "nagad"],
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -139,6 +142,7 @@ router.post("/shops", async (req, res): Promise<void> => {
         ownerName: ownerName ?? null,
         area: area ?? null,
         subscriptionPlan: organizationName ? "organization" : "basic",
+        enabledPaymentMethods: parsed.data.enabledPaymentMethods ?? ["bkash", "nagad"],
       })
       .returning();
 

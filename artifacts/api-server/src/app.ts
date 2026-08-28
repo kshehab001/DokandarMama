@@ -173,11 +173,12 @@ if (staticDir) {
   const resolvedDir = path.resolve(staticDir);
   const indexHtmlPath = path.join(resolvedDir, "index.html");
   if (fs.existsSync(indexHtmlPath)) {
-    app.use((req, res, next) => {
+    app.use((req, res, next): void => {
       if (req.method === "GET" && !req.path.startsWith("/api")) {
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         const html = getInjectedIndexHtml(indexHtmlPath);
-        return res.send(html);
+        res.send(html);
+        return;
       }
       next();
     });

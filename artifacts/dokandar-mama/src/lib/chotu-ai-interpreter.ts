@@ -17,6 +17,8 @@ export type ChotuIntentType =
   | "CHECK_DUE"
   | "CHECK_SALES_SUMMARY"
   | "CHECK_CASHBOX"
+  | "CHECK_DIGITAL_BALANCE"
+  | "CHECK_TOTAL_BALANCE"
   | "CHECK_RESTOCK"
   | "CHECK_TOP_PRODUCTS"
   | "OPEN_PAGE"
@@ -34,6 +36,7 @@ export interface ChotuParsedResult {
     amount?: number
     quantity?: number
     paymentMethod?: "cash" | "digital" | "baki"
+    digitalProvider?: string
     timeframe?: "today" | "week" | "month"
     targetPage?: "billing" | "inventory" | "customers" | "reports" | "cashbox"
   }
@@ -71,6 +74,56 @@ export function matchLocalIntent(rawText: string): ChotuParsedResult | null {
       confidence: "HIGH",
       parameters: {},
       spokenFeedback: "কীভাবে সাহায্য করতে পারি মামা?",
+    }
+  }
+
+  // 1b. DIGITAL BALANCE (বিকাশ, নগদ, রকেট, উপায়)
+  if (
+    text.includes("বিকাশ") ||
+    text.includes("bkash") ||
+    text.includes("নগদ") ||
+    text.includes("nagad") ||
+    text.includes("রকেট") ||
+    text.includes("rocket") ||
+    text.includes("উপায়") ||
+    text.includes("upay") ||
+    text.includes("ডিজিটাল") ||
+    text.includes("digital")
+  ) {
+    if (
+      text.includes("কত") ||
+      text.includes("ব্যালেন্স") ||
+      text.includes("টাকা") ||
+      text.includes("balance") ||
+      text.includes("koto") ||
+      text.includes("ase") ||
+      text.includes("আছে")
+    ) {
+      let provider = "all"
+      if (text.includes("বিকাশ") || text.includes("bkash")) provider = "bkash"
+      else if (text.includes("নগদ") || text.includes("nagad")) provider = "nagad"
+      else if (text.includes("রকেট") || text.includes("rocket")) provider = "rocket"
+      else if (text.includes("উপায়") || text.includes("upay")) provider = "upay"
+
+      return {
+        intent: "CHECK_DIGITAL_BALANCE",
+        confidence: "HIGH",
+        parameters: { digitalProvider: provider },
+      }
+    }
+  }
+
+  // 1c. TOTAL SHOP BALANCE (দোকানে কত টাকা আছে, মোট টাকা, মোট ব্যালেন্স)
+  if (
+    (text.includes("দোকানে") && (text.includes("কত") || text.includes("টাকা") || text.includes("হিসাব"))) ||
+    (text.includes("মোট") && (text.includes("টাকা") || text.includes("ব্যালেন্স") || text.includes("balance") || text.includes("টাকা আছে"))) ||
+    text.includes("total balance") ||
+    text.includes("dokane koto taka")
+  ) {
+    return {
+      intent: "CHECK_TOTAL_BALANCE",
+      confidence: "HIGH",
+      parameters: {},
     }
   }
 

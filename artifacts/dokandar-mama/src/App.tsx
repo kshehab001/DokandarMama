@@ -26,6 +26,7 @@ import { Cashbox } from '@/pages/cashbox';
 import { Landing } from '@/pages/landing';
 import { SignInPage } from '@/pages/sign-in';
 import { SignUpPage } from '@/pages/sign-up';
+import { ManagementPage } from '@/pages/management';
 
 const queryClient = new QueryClient();
 
@@ -220,6 +221,13 @@ function Router() {
         <AuthedRoute>
           <RoleGuard minRole="manager" fallbackTitle="রিপোর্ট ও অ্যানালিটিক্স অ্যাক্সেস সংরক্ষিত">
             <Reports />
+          </RoleGuard>
+        </AuthedRoute>
+      </Route>
+      <Route path="/app/management">
+        <AuthedRoute>
+          <RoleGuard minRole="owner" fallbackTitle="মালিক ব্যবস্থাপনা প্যানেল সংরক্ষিত">
+            <ManagementPage />
           </RoleGuard>
         </AuthedRoute>
       </Route>

@@ -378,8 +378,8 @@ export function VoiceAssistant() {
       const parsed: ChotuParsedResult = await interpretNaturalLanguageWithAI(
         rawText,
         {
-          availableProducts: products?.map((p) => p.name) || [],
-          availableCustomers: customers?.map((c) => c.name) || [],
+          availableProducts: products?.map((p: any) => p.name) || [],
+          availableCustomers: customers?.map((c: any) => c.name) || [],
         },
         import.meta.env.VITE_GEMINI_API_KEY
       )
@@ -411,17 +411,49 @@ export function VoiceAssistant() {
           }
 
           case "CHECK_CASHBOX": {
-            const balance = cashbox?.expectedClosing ?? cashbox?.session?.openingBalance ?? 0
-            reply = `${getPersonalityGreeting()}ক্যাশ ড্রয়ারে বর্তমানে ৳${balance} টাকা হিসাব আছে।`
+            const balance = (dashboard as any)?.cashBalance ?? cashbox?.expectedClosing ?? cashbox?.session?.openingBalance ?? 0
+            reply = `${getPersonalityGreeting()}ক্যাশ বাক্সে বর্তমানে ৳${balance} টাকা আছে।`
+            success = true
+            break
+          }
+
+          case "CHECK_DIGITAL_BALANCE": {
+            const provider = parsed.parameters.digitalProvider || "all"
+            const breakdown = (dashboard as any)?.digitalBreakdown || {}
+            if (provider === "bkash") {
+              const amount = breakdown.bkash ?? 0
+              reply = `${getPersonalityGreeting()}বিকাশে মোট ৳${amount} টাকা ডিজিটাল পেমেন্ট জমা আছে।`
+            } else if (provider === "nagad") {
+              const amount = breakdown.nagad ?? 0
+              reply = `${getPersonalityGreeting()}নগদে মোট ৳${amount} টাকা ডিজিটাল পেমেন্ট জমা আছে।`
+            } else if (provider === "rocket") {
+              const amount = breakdown.rocket ?? 0
+              reply = `${getPersonalityGreeting()}রকেটে মোট ৳${amount} টাকা ডিজিটাল পেমেন্ট জমা আছে।`
+            } else if (provider === "upay") {
+              const amount = breakdown.upay ?? 0
+              reply = `${getPersonalityGreeting()}উপায়ে মোট ৳${amount} টাকা ডিজিটাল পেমেন্ট জমা আছে।`
+            } else {
+              const totalDigital = (dashboard as any)?.digitalBalance ?? 0
+              reply = `${getPersonalityGreeting()}মোট ডিজিটাল ব্যালেন্স ৳${totalDigital} টাকা (বিকাশ: ৳${breakdown.bkash ?? 0}, নগদ: ৳${breakdown.nagad ?? 0})।`
+            }
+            success = true
+            break
+          }
+
+          case "CHECK_TOTAL_BALANCE": {
+            const totalBalance = (dashboard as any)?.totalCurrentBalance ?? 0
+            const cash = (dashboard as any)?.cashBalance ?? 0
+            const digital = (dashboard as any)?.digitalBalance ?? 0
+            reply = `${getPersonalityGreeting()}দোকানে বর্তমানে মোট ৳${totalBalance} টাকা ব্যালেন্স আছে (ক্যাশ: ৳${cash}, ডিজিটাল: ৳${digital})।`
             success = true
             break
           }
 
           case "CHECK_RESTOCK": {
             const lowCount = dashboard?.lowStockCount ?? 0
-            const lowItems = products?.filter((p) => p.stock <= p.lowStockThreshold) || []
+            const lowItems = products?.filter((p: any) => p.stock <= p.lowStockThreshold) || []
             if (lowItems.length > 0) {
-              const names = lowItems.slice(0, 3).map((p) => p.name).join(", ")
+              const names = lowItems.slice(0, 3).map((p: any) => p.name).join(", ")
               reply = `${getPersonalityGreeting()}${lowCount} টি পণ্যের স্টক কম: ${names}${lowItems.length > 3 ? " ইত্যাদি" : ""}।`
             } else {
               reply = `${getPersonalityGreeting()}সব পণ্যের পর্যাপ্ত স্টক আছে, কোনো ঘাটতি নেই।`
@@ -449,7 +481,7 @@ export function VoiceAssistant() {
               break
             }
             const matched = products?.find(
-              (p) => p.name.toLowerCase().includes(target) || target.includes(p.name.toLowerCase())
+              (p: any) => p.name.toLowerCase().includes(target) || target.includes(p.name.toLowerCase())
             )
             if (matched) {
               const currentStock = Number(matched.stock)
@@ -478,7 +510,7 @@ export function VoiceAssistant() {
               break
             }
             const matched = customers?.find(
-              (c) => c.name.toLowerCase().includes(target) || target.includes(c.name.toLowerCase())
+              (c: any) => c.name.toLowerCase().includes(target) || target.includes(c.name.toLowerCase())
             )
             if (matched) {
               reply = `${getPersonalityGreeting()}${matched.name}-এর বাকি আছে ৳${matched.bakiBalance} টাকা।`
@@ -494,7 +526,7 @@ export function VoiceAssistant() {
             const amount = parsed.parameters.amount || 0
             if (amount > 0 && customers && customers.length > 0) {
               const matched = customers.find(
-                (c) => c.name.toLowerCase().includes(target) || target.includes(c.name.toLowerCase())
+                (c: any) => c.name.toLowerCase().includes(target) || target.includes(c.name.toLowerCase())
               )
               if (matched) {
                 await recordPayment.mutateAsync({
@@ -603,51 +635,14 @@ export function VoiceAssistant() {
 
   return (
     <>
-      {/* Floating Draggable Chotu AI Companion */}
-      <div
-        style={{
-          right: `${position.x}px`,
-          bottom: `${position.y}px`,
-        }}
-        onPointerDown={handlePointerDown}
-        className="fixed z-50 select-none touch-none group"
-      >
-        <div className="relative flex flex-col items-center">
-          {/* Quick Tooltip speech on idle hover */}
-          {!isOpen && (
-            <div className="absolute -top-10 bg-card/95 backdrop-blur-md text-foreground text-[11px] font-bold px-3 py-1 rounded-full shadow-lg border border-primary/30 whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity animate-in fade-in slide-in-from-bottom-2 flex items-center gap-1.5">
-              <span>{chotuConfig.customGreeting || "বলুন মামা, আমি আছি!"}</span>
-            </div>
-          )}
-
-          {/* Main Chotu Character Button */}
-          <div
-            onClick={(e) => {
-              if (!isDraggingRef.current) {
-                setIsOpen((prev) => !prev)
-              }
-            }}
-            className="cursor-pointer transition-transform hover:scale-105 active:scale-95"
-            title="ছোটু - আপনার এআই দোকান সহকারী (ক্লিক করুন)"
-          >
-            <ChotuAvatar
-              config={chotuConfig}
-              state={chotuState}
-              interactive={false}
-              showAura={true}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Chotu Interactive Speech Bubble & Action Panel */}
+      {/* Chotu Interactive Speech Bubble & Action Panel (Triggered from ChouFloatingWidget) */}
       {isOpen && (
         <div
           style={{
-            right: `${Math.min(window.innerWidth - 320, Math.max(16, position.x))}px`,
-            bottom: `${position.y + 110}px`,
+            right: `${Math.min(window.innerWidth - 340, Math.max(16, position.x))}px`,
+            bottom: `${Math.min(window.innerHeight - 380, Math.max(80, position.y + 70))}px`,
           }}
-          className="fixed w-80 max-w-[calc(100vw-32px)] bg-card/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-primary/20 p-4 z-50 animate-in zoom-in-95 slide-in-from-bottom-4 duration-200"
+          className="fixed w-80 max-w-[calc(100vw-32px)] bg-card/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-primary/20 p-4 z-[95] animate-in zoom-in-95 slide-in-from-bottom-4 duration-200"
         >
           {/* Header */}
           <div className="flex items-center justify-between pb-2 mb-2 border-b">

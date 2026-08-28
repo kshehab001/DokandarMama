@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "framer-motion"
 import { Volume2, VolumeX, Store, Sparkles, Sun, Moon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
+import { ChotuAvatar } from "./chotu-avatar"
+
 interface ShopShutterProps {
   mode?: "daily_open" | "manual_close"
   onComplete?: () => void
@@ -184,19 +186,11 @@ export function ShopShutter({
             initial={{ scale: 0.8, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.7 }}
-            className="relative mb-4"
+            className="relative mb-4 flex items-center justify-center"
           >
-            <div className="w-24 h-24 rounded-full bg-gradient-to-tr from-primary to-amber-400 p-1 shadow-2xl shadow-primary/30 flex items-center justify-center">
-              <div className="w-full h-full rounded-full bg-zinc-950 flex flex-col items-center justify-center text-primary relative overflow-hidden">
-                {/* Chotu Animated Face Graphic */}
-                <div className="text-3xl">👦🏽</div>
-                <div className="text-[10px] font-black uppercase text-amber-400 tracking-tighter mt-0.5">
-                  ছোটু মামা
-                </div>
-              </div>
-            </div>
+            <ChotuAvatar state="idle" showAura className="w-24 h-28" interactive={false} />
             {/* Sparkle Badge */}
-            <div className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md animate-bounce">
+            <div className="absolute top-0 right-2 w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md animate-bounce">
               {isOpening ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </div>
           </motion.div>

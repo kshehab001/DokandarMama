@@ -125,6 +125,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       { href: "/app/customers", label: category.terminology.bakiLabel, icon: Users },
       { href: "/app/cashbox", label: t("nav.cashbox", "ক্যাশ বক্স"), icon: Wallet },
       { href: "/app/reports", label: t("nav.reports", "আর্থিক খতিয়ান"), icon: BarChart3 },
+      { href: "/app/management", label: "ম্যানেজমেন্ট", icon: Crown },
     ]
   })()
 

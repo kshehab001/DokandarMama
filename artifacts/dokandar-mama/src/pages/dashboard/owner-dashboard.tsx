@@ -49,6 +49,10 @@ import {
   Crown,
   ChevronRight,
   Activity,
+  Download,
+  CreditCard,
+  Coins,
+  FileSpreadsheet,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
@@ -88,6 +92,69 @@ export function OwnerDashboard() {
   const [isOpenCashboxModal, setIsOpenCashboxModal] = useState(false)
   const [openingBalance, setOpeningBalance] = useState("")
   const [openingNote, setOpeningNote] = useState("")
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
+  const [exportRange, setExportRange] = useState<"today" | "week" | "month" | "all">("month")
+  const [exportType, setExportType] = useState<"sales" | "inventory" | "customers" | "all">("all")
+  const [isExporting, setIsExporting] = useState(false)
+
+  const handleDownloadReport = async () => {
+    setIsExporting(true)
+    try {
+      const token = localStorage.getItem("clerk-db-jwt") || ""
+      const shopId = activeShop?.id
+      const res = await fetch(`/api/reports/export?range=${exportRange}&type=${exportType}`, {
+        headers: {
+          ...(shopId ? { "x-shop-id": String(shopId) } : {}),
+        },
+      })
+      if (!res.ok) throw new Error("Export failed")
+      const data = await res.json()
+
+      // Format CSV based on exportType
+      let csvContent = ""
+      if (exportType === "sales" || exportType === "all") {
+        csvContent += "=== SALES REPORT ===\nDate,Bill ID,Customer,Payment Method,Provider,Trx ID,Total,Paid,Due\n"
+        data.sales?.forEach((s: any) => {
+          csvContent += `"${new Date(s.date).toLocaleDateString("bn-BD")}","#${s.id}","${s.customerName || "General"}","${s.paymentMethod}","${s.digitalProvider || ""}","${s.digitalTrxId || ""}",${s.total},${s.paidAmount},${s.dueAmount}\n`
+        })
+        csvContent += "\n"
+      }
+
+      if (exportType === "inventory" || exportType === "all") {
+        csvContent += "=== INVENTORY REPORT ===\nProduct ID,Product Name,Barcode,Category,Price,Cost Price,Stock,Unit,EXP Date\n"
+        data.products?.forEach((p: any) => {
+          csvContent += `#${p.id},"${p.name}","${p.barcode || ""}","${p.category}",${p.price},${p.costPrice || 0},${p.stock},"${p.unit}","${p.expiryDate ? p.expiryDate.split("T")[0] : ""}"\n`
+        })
+        csvContent += "\n"
+      }
+
+      if (exportType === "customers" || exportType === "all") {
+        csvContent += "=== CUSTOMERS & BAKI REPORT ===\nCustomer ID,Name,Phone,Baki Balance\n"
+        data.customers?.forEach((c: any) => {
+          csvContent += `#${c.id},"${c.name}","${c.phone || ""}",${c.bakiBalance}\n`
+        })
+      }
+
+      // Trigger download
+      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `dokandar_mama_report_${exportRange}_${new Date().toISOString().split("T")[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      setIsExportModalOpen(false)
+      toast({ title: "✓ রিপোর্ট সফলভাবে ডাউনলোড হয়েছে!" })
+    } catch (err) {
+      toast({ title: "রিপোর্ট তৈরি করতে সমস্যা হয়েছে", variant: "destructive" })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   const [isExpenseModal, setIsExpenseModal] = useState(false)
   const [expenseCategoryIdx, setExpenseCategoryIdx] = useState(0)
   const [expenseAmount, setExpenseAmount] = useState("")
@@ -198,13 +265,26 @@ export function OwnerDashboard() {
               {activeShop?.name || metadata?.shopName || "আপনার দোকান"} — সম্পূর্ণ ব্যবসার খতিয়ান
             </p>
           </div>
-          {/* Multi-shop summary badge */}
-          {allShops.length > 1 && (
-            <Badge className="bg-primary/10 text-primary border-primary/30 text-xs px-3 py-1.5 gap-1.5">
-              <Building2 className="h-3.5 w-3.5" />
-              {allShops.length} টি শাখা
-            </Badge>
-          )}
+          
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl font-bold gap-2 h-9 border-border bg-card shadow-sm hover:bg-muted"
+              onClick={() => setIsExportModalOpen(true)}
+            >
+              <Download className="h-4 w-4 text-primary" />
+              <span>রিপোর্ট ডাউনলোড / এক্সপোর্ট</span>
+            </Button>
+
+            {/* Multi-shop summary badge */}
+            {allShops.length > 1 && (
+              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs px-3 py-1.5 gap-1.5">
+                <Building2 className="h-3.5 w-3.5" />
+                {allShops.length} টি শাখা
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Multi-shop selector for owner */}
@@ -226,6 +306,71 @@ export function OwnerDashboard() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Real-time Current Balances Position Banner (Cash, Digital & Total) */}
+      <div className="p-4 sm:p-5 rounded-3xl bg-card border border-primary/20 shadow-sm relative overflow-hidden">
+        <div className="flex items-center justify-between pb-3 mb-3 border-b">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-primary/10 text-primary">
+              <Coins className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="font-extrabold text-base text-foreground">বর্তমান আর্থিক স্থিতি (Current Balances)</h3>
+              <p className="text-xs text-muted-foreground">দোকানের লাইভ ক্যাশ ও ডিজিটাল একাউন্ট হিসাব</p>
+            </div>
+          </div>
+          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-xs font-bold gap-1">
+            <Activity className="h-3 w-3 animate-pulse" />
+            লাইভ ব্যালেন্স
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* 1. Cash Balance */}
+          <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/80">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-bold text-muted-foreground">ক্যাশ ক্যাটাগরি (নগদ)</span>
+              <Wallet className="h-4 w-4 text-emerald-600" />
+            </div>
+            <div className="text-2xl font-black text-foreground">
+              ৳ {(overview as any)?.cashBalance ?? drawerExpected}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5">
+              ড্রয়ারে সরাসরি রক্ষিত ক্যাশ টাকা
+            </div>
+          </div>
+
+          {/* 2. Digital Balance */}
+          <div className="p-3.5 rounded-2xl bg-muted/40 border border-border/80">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-bold text-muted-foreground">ডিজিটাল ব্যালেন্স</span>
+              <CreditCard className="h-4 w-4 text-primary" />
+            </div>
+            <div className="text-2xl font-black text-primary">
+              ৳ {(overview as any)?.digitalBalance ?? 0}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-2">
+              <span>বিকাশ: ৳{(overview as any)?.digitalBreakdown?.bkash ?? 0}</span>
+              <span>•</span>
+              <span>নগদ: ৳{(overview as any)?.digitalBreakdown?.nagad ?? 0}</span>
+            </div>
+          </div>
+
+          {/* 3. Total Balance */}
+          <div className="p-3.5 rounded-2xl bg-primary/10 border border-primary/30">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-black text-primary uppercase">দোকানের মোট ব্যালেন্স</span>
+              <Crown className="h-4 w-4 text-amber-500" />
+            </div>
+            <div className="text-2xl font-black text-foreground">
+              ৳ {(overview as any)?.totalCurrentBalance ?? ((overview as any)?.cashBalance || 0) + ((overview as any)?.digitalBalance || 0)}
+            </div>
+            <div className="text-[11px] text-primary/80 font-semibold mt-0.5">
+              মোট নগদ ও ডিজিটাল পেমেন্ট মিলিয়ে
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Category Quick Actions — from theme config */}
@@ -444,7 +589,7 @@ export function OwnerDashboard() {
           <CardContent>
             {restockSuggestions && restockSuggestions.length > 0 ? (
               <ul className="space-y-2">
-                {restockSuggestions.slice(0, 4).map((s) => (
+                {restockSuggestions.slice(0, 4).map((s: any) => (
                   <li key={s.productId} className="flex justify-between items-center text-sm border-b border-border/50 last:border-0 pb-2 last:pb-0">
                     <span className="font-medium text-foreground truncate max-w-[60%]">{s.productName}</span>
                     <span className="text-muted-foreground text-xs">স্টক {s.stock}</span>
@@ -470,7 +615,7 @@ export function OwnerDashboard() {
           <CardContent>
             {topProducts && topProducts.length > 0 ? (
               <ul className="space-y-2">
-                {topProducts.slice(0, 4).map((p) => (
+                {topProducts.slice(0, 4).map((p: any) => (
                   <li key={p.productId} className="flex justify-between items-center text-sm border-b border-border/50 last:border-0 pb-2 last:pb-0">
                     <span className="font-medium text-foreground truncate max-w-[60%]">{p.productName}</span>
                     <span className="text-muted-foreground">{p.quantitySold} বিক্রি</span>
@@ -589,6 +734,99 @@ export function OwnerDashboard() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Export / Download Data Dialog */}
+      <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <FileSpreadsheet className="h-5 w-5 text-primary" />
+              দোকানের ডাটা ও রিপোর্ট ডাউনলোড
+            </DialogTitle>
+            <DialogDescription>
+              বিক্রি, পণ্য তালিকা বা কাস্টমার বাকির সম্পূর্ণ হিসাব এক্সেল / CSV ফরম্যাটে সেভ করুন।
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3">
+            <div>
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">
+                রিপোর্টের ধরন বেছে নিন
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: "all", label: "সম্পূর্ণ ব্যবসা (সব ডাটা)" },
+                  { id: "sales", label: "বিক্রি ও ক্যাশমেমো" },
+                  { id: "inventory", label: "ইনভেন্টরি ও পণ্য" },
+                  { id: "customers", label: "কাস্টমার ও বাকি" },
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setExportType(t.id as any)}
+                    className={cn(
+                      "p-3 rounded-2xl border text-xs font-bold text-left transition-all",
+                      exportType === t.id
+                        ? "border-primary bg-primary/10 text-primary shadow-sm"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">
+                সময়সীমা (Time Range)
+              </label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {[
+                  { id: "today", label: "আজকে" },
+                  { id: "week", label: "৭ দিন" },
+                  { id: "month", label: "৩০ দিন" },
+                  { id: "all", label: "সব" },
+                ].map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => setExportRange(r.id as any)}
+                    className={cn(
+                      "py-2 rounded-xl border text-xs font-bold transition-all text-center",
+                      exportRange === r.id
+                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsExportModalOpen(false)}
+              className="rounded-xl"
+            >
+              বাতিল
+            </Button>
+            <Button
+              type="button"
+              onClick={handleDownloadReport}
+              disabled={isExporting}
+              className="rounded-xl font-bold gap-2"
+            >
+              <Download className="h-4 w-4" />
+              {isExporting ? "তৈরি হচ্ছে..." : "CSV ডাউনলোড করুন"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
