@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 240" width="100%" height="100%">
+  <defs>
+    <linearGradient id="chotuSkin" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFE4C7" />
+      <stop offset="60%" stop-color="#FED7AA" />
+      <stop offset="100%" stop-color="#FDBA74" />
+    </linearGradient>
+    <linearGradient id="chotuSkinShadow" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FED7AA" />
+      <stop offset="100%" stop-color="#F97316" stop-opacity="0.6" />
+    </linearGradient>
+    <linearGradient id="chotuHair" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3D261D" />
+      <stop offset="50%" stop-color="#26160F" />
+      <stop offset="100%" stop-color="#140B07" />
+    </linearGradient>
+    <linearGradient id="chotuCap" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#22C55E" />
+      <stop offset="40%" stop-color="#16A34A" />
+      <stop offset="100%" stop-color="#15803D" />
+    </linearGradient>
+    <linearGradient id="chotuVisor" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#15803D" />
+      <stop offset="100%" stop-color="#14532D" />
+    </linearGradient>
+    <linearGradient id="chotuVest" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B82F6" />
+      <stop offset="50%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#1D4ED8" />
+    </linearGradient>
+    <linearGradient id="genieTailGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#67E8F9" stop-opacity="0.95" />
+      <stop offset="40%" stop-color="#38BDF8" stop-opacity="0.9" />
+      <stop offset="75%" stop-color="#0284C7" stop-opacity="0.75" />
+      <stop offset="100%" stop-color="#0369A1" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="genieCoreGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#E0F2FE" />
+      <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.9" />
+    </linearGradient>
+
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity="0.15" />
+    </filter>
+  </defs>
+
+  <!-- Celebration Confetti & Glow -->
+  <g opacity="0.85">
+    <circle cx="100" cy="185" r="32" fill="#38BDF8" filter="url(#softGlow)" opacity="0.4" />
+    <polygon points="40,60 44,56 46,62 42,66" fill="#F43F5E" />
+    <polygon points="160,50 164,48 166,54 162,56" fill="#22C55E" />
+    <polygon points="170,85 174,80 178,84 174,88" fill="#FACC15" />
+    <polygon points="30,85 34,80 38,84 34,88" fill="#38BDF8" />
+    <polygon points="100,10 102,5 104,10 108,12 104,14 102,19 100,14 96,12" fill="#FACC15" />
+  </g>
+
+  <!-- Sinuous Glowing Genie Tail -->
+  <g class="genie-tail" filter="url(#dropShadow)">
+    <path d="M 86 160 C 76 182 64 195 50 208 C 38 220 54 235 72 228 C 96 220 114 198 116 160 Z" fill="url(#genieTailGrad)" />
+    <path d="M 94 162 C 84 182 74 196 62 210 C 56 216 64 222 72 218 C 88 210 104 192 106 162 Z" fill="url(#genieCoreGrad)" opacity="0.75" />
+    <path d="M 90 166 Q 78 190 62 208 T 52 222" fill="none" stroke="#BAE6FD" stroke-width="2" stroke-linecap="round" stroke-dasharray="4 6" opacity="0.8" />
+  </g>
+
+  <!-- Torso & Clothing -->
+  <g id="torso" filter="url(#dropShadow)">
+    <path d="M 72 126 L 128 126 L 120 165 C 110 167 90 167 80 165 Z" fill="#FFFFFF" />
+    <path d="M 68 126 L 88 126 L 85 165 L 64 162 C 65 148 66 136 68 126 Z" fill="url(#chotuVest)" />
+    <path d="M 132 126 L 112 126 L 115 165 L 136 162 C 135 148 134 136 132 126 Z" fill="url(#chotuVest)" />
+  </g>
+
+  <!-- Arms: Victory Cheering Both Fists Raised -->
+  <g id="arms" filter="url(#dropShadow)">
+    <!-- Left Arm Raised Up -->
+    <path d="M 68 126 C 46 116 38 88 44 72 C 48 66 54 70 54 76 C 52 86 58 110 74 128 Z" fill="url(#chotuSkin)" />
+    <!-- Left Fist -->
+    <circle cx="44" cy="70" r="7" fill="url(#chotuSkin)" />
+
+    <!-- Right Arm Raised Up High in Victory -->
+    <path d="M 132 126 C 154 116 162 88 156 72 C 152 66 146 70 146 76 C 148 86 142 110 126 128 Z" fill="url(#chotuSkin)" />
+    <!-- Right Fist -->
+    <circle cx="156" cy="70" r="7" fill="url(#chotuSkin)" />
+  </g>
+
+  <!-- Neck -->
+  <path d="M 90 114 L 110 114 L 108 128 L 92 128 Z" fill="url(#chotuSkinShadow)" />
+  <path d="M 92 114 L 108 114 L 106 126 L 94 126 Z" fill="url(#chotuSkin)" />
+
+  <!-- Head & Face (Joyful Celebration (^_^)) -->
+  <g id="head" filter="url(#dropShadow)">
+    <path d="M 64 64 C 54 80 56 106 70 118 C 76 122 84 124 100 124 C 116 124 124 122 130 118 C 144 106 146 80 136 64 Z" fill="url(#chotuHair)" />
+    <ellipse cx="64" cy="94" rx="7.5" ry="10" fill="url(#chotuSkin)" />
+    <ellipse cx="136" cy="94" rx="7.5" ry="10" fill="url(#chotuSkin)" />
+    <path d="M 68 84 C 68 108 82 122 100 122 C 118 122 132 108 132 84 C 132 68 118 64 100 64 C 82 64 68 68 68 84 Z" fill="url(#chotuSkin)" />
+    <ellipse cx="76" cy="102" rx="7" ry="4.5" fill="#F43F5E" opacity="0.32" />
+    <ellipse cx="124" cy="102" rx="7" ry="4.5" fill="#F43F5E" opacity="0.32" />
+    <path d="M 66 70 C 72 82 82 86 90 80 C 98 88 112 86 122 74 C 128 78 134 76 135 70 Z" fill="url(#chotuHair)" />
+
+    <!-- Cap & Visor -->
+    <g id="cap">
+      <path d="M 65 68 C 65 40 80 32 100 32 C 120 32 135 40 135 68 C 125 64 115 62 100 62 C 85 62 75 64 65 68 Z" fill="url(#chotuCap)" />
+      <circle cx="100" cy="48" r="8" fill="#FFFFFF" opacity="0.95" />
+      <polygon points="100,43 103,47 106,47 103,50 105,54 100,51 95,54 97,50 94,47 97,47" fill="#15803D" />
+      <path d="M 58 66 C 68 60 100 58 142 66 C 146 72 138 78 100 78 C 62 78 54 72 58 66 Z" fill="url(#chotuVisor)" />
+      <path d="M 62 67 Q 100 61 138 67" stroke="#4ADE80" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.8" />
+    </g>
+
+    <!-- Joyful Eyes (^_^) and Big Open Cheering Smile -->
+    <g id="face-features">
+      <!-- Left Happy Eye Curve -->
+      <path d="M 76 92 Q 84 84 92 92" fill="none" stroke="#26160F" stroke-width="3.5" stroke-linecap="round" />
+      <path d="M 76 80 Q 84 75 92 80" fill="none" stroke="#26160F" stroke-width="2.5" stroke-linecap="round" />
+
+      <!-- Right Happy Eye Curve -->
+      <path d="M 108 92 Q 116 84 124 92" fill="none" stroke="#26160F" stroke-width="3.5" stroke-linecap="round" />
+      <path d="M 108 80 Q 116 75 124 80" fill="none" stroke="#26160F" stroke-width="2.5" stroke-linecap="round" />
+
+      <!-- Nose -->
+      <ellipse cx="100" cy="97" rx="2.5" ry="1.75" fill="#F97316" opacity="0.6" />
+
+      <!-- Big Open Cheering Smile -->
+      <path d="M 88 103 Q 100 120 112 103 Q 100 114 88 103 Z" fill="#3D261D" />
+      <path d="M 91 104 Q 100 103 109 104 Q 109 106 100 106 Q 91 106 91 104 Z" fill="#FFFFFF" />
+      <path d="M 92 110 Q 100 119 108 110 Q 100 116 92 110 Z" fill="#F43F5E" />
+    </g>
+  </g>
+</svg>

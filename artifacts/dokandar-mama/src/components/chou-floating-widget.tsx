@@ -442,6 +442,7 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
         >
           <ChotuAvatar
             state={avatarState}
+            pose={pose}
             className="w-16 h-20 cursor-grab active:cursor-grabbing"
             showAura
             interactive={false}

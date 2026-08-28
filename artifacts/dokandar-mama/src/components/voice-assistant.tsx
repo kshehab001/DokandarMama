@@ -82,7 +82,11 @@ export function VoiceAssistant() {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const { category } = useShopTheme()
-  const { position, setPose } = useChouPresence()
+  const { position, setPosition, setPose } = useChouPresence()
+
+  // Dragging refs
+  const isDraggingRef = useRef(false)
+  const dragStartRef = useRef({ clientX: 0, clientY: 0, posX: 0, posY: 0 })
 
   // Chotu configuration and state
   const [chotuConfig, setChotuConfig] = useState<ChotuConfig>(() => loadSavedChotuConfig())

@@ -188,7 +188,7 @@ export function ShopShutter({
             transition={{ duration: 0.5, delay: 0.7 }}
             className="relative mb-4 flex items-center justify-center"
           >
-            <ChotuAvatar state="idle" showAura className="w-24 h-28" interactive={false} />
+            <ChotuAvatar state="idle" pose="shutter" showAura className="w-24 h-28" interactive={false} />
             {/* Sparkle Badge */}
             <div className="absolute top-0 right-2 w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-md animate-bounce">
               {isOpening ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}

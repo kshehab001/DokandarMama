@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useUser } from "@clerk/react"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   useGetCurrentShop,
   useUpdateCurrentShop,
@@ -46,7 +46,9 @@ export function ManagementPage() {
   const { user } = useUser()
   const { toast } = useToast()
   const queryClient = useQueryClient()
-  const { activeShop, isOwner } = useShopTheme()
+  const { category: currentCategory, changeShopCategory } = useShopTheme()
+
+  const { data: activeShop } = useGetCurrentShop()
   const updateShopMutation = useUpdateCurrentShop()
 
   // Shop Settings State
@@ -78,12 +80,66 @@ export function ManagementPage() {
   })
 
   // Filter out admin/owner from staff list since owner is displayed in special top card
-  const staffMembers = membersData.filter((m) => m.role !== "admin")
+  const staffMembers = membersData.filter((m: any) => m.role !== "admin")
 
   const [newMemberName, setNewMemberName] = useState("")
   const [newMemberUserId, setNewMemberUserId] = useState("")
   const [newMemberRole, setNewMemberRole] = useState<"manager" | "shopkeeper">("shopkeeper")
   const [isAddingMember, setIsAddingMember] = useState(false)
+
+  const togglePaymentMethod = (methodId: string) => {
+    setEnabledMethods((prev) => {
+      const next = prev.includes(methodId)
+        ? prev.filter((m) => m !== methodId)
+        : [...prev, methodId]
+      if (activeShop?.id) {
+        updateShopMutation.mutate(
+          {
+            data: {
+              enabledPaymentMethods: next,
+            } as any,
+          },
+          {
+            onSuccess: () => {
+              queryClient.invalidateQueries({ queryKey: getGetCurrentShopQueryKey() })
+              queryClient.invalidateQueries({ queryKey: getListShopsQueryKey() })
+              toast({ title: "পেমেন্ট মাধ্যম আপডেট করা হয়েছে" })
+            },
+          }
+        )
+      }
+      return next
+    })
+  }
+
+  const handleSaveShopProfile = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!shopName.trim()) {
+      toast({ title: "দোকানের নাম আবশ্যক", variant: "destructive" })
+      return
+    }
+    updateShopMutation.mutate(
+      {
+        data: {
+          name: shopName.trim(),
+          ownerName: ownerName.trim() || undefined,
+          area: area.trim() || undefined,
+          category: category as any,
+        } as any,
+      },
+      {
+        onSuccess: () => {
+          changeShopCategory(category as any)
+          queryClient.invalidateQueries({ queryKey: getGetCurrentShopQueryKey() })
+          queryClient.invalidateQueries({ queryKey: getListShopsQueryKey() })
+          toast({ title: "✓ দোকানের তথ্য সফলভাবে আপডেট হয়েছে" })
+        },
+        onError: (err: any) => {
+          toast({ title: err?.message || "সংরক্ষণ করা যায়নি", variant: "destructive" })
+        },
+      }
+    )
+  }
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -314,7 +370,7 @@ export function ManagementPage() {
                 কোনো অতিরিক্ত কর্মী যুক্ত নেই। ওপরের ফর্ম দিয়ে নতুন কর্মী যোগ করুন।
               </div>
             ) : (
-              staffMembers.map((m) => (
+              staffMembers.map((m: any) => (
                 <div
                   key={m.id}
                   className="p-3.5 rounded-2xl bg-card border border-border flex items-center justify-between"

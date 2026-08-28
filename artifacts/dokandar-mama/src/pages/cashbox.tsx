@@ -307,7 +307,7 @@ export function Cashbox() {
               {(state?.movements ?? []).length === 0 && (
                 <p className="text-muted-foreground">এখনো কোনো লেনদেন নেই</p>
               )}
-              {(state?.movements ?? []).map((m) => {
+              {(state?.movements ?? []).map((m: any) => {
                 const isIn = m.type === "sale" || m.type === "cash_in"
                 return (
                   <div
@@ -415,12 +415,12 @@ export function Cashbox() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {(sessions ?? []).filter((s) => s.status === "closed").length === 0 && (
+          {(sessions as any ?? []).filter((s: any) => s.status === "closed").length === 0 && (
             <p className="text-muted-foreground">কোনো বন্ধ করা হিসাব নেই</p>
           )}
-          {(sessions ?? [])
-            .filter((s) => s.status === "closed")
-            .map((s) => (
+          {(sessions as any ?? [])
+            .filter((s: any) => s.status === "closed")
+            .map((s: any) => (
               <div
                 key={s.id}
                 className="flex items-center justify-between border-b border-border py-2 last:border-0"
