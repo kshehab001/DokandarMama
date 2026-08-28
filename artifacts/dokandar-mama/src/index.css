@@ -157,3 +157,13 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* ── Chotu Avatar Animations ───────────────────────────────────────────── */
+@keyframes chotuBob {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+.chotu-bob {
+  animation: chotuBob 3s ease-in-out infinite;
+}
