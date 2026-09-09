@@ -3,7 +3,10 @@ import { useQueryClient } from "@tanstack/react-query"
 import {
   useCreatePurchaseInvoice,
   useConfirmPurchaseInvoice,
+  useCreateProduct,
+  useUpdateProduct,
   getListProductsQueryKey,
+  getGetDashboardOverviewQueryKey,
   type Product,
 } from "@workspace/api-client-react"
 import {
@@ -65,6 +68,8 @@ export function SellerBillDialog({
 
   const createInvoice = useCreatePurchaseInvoice()
   const confirmInvoice = useConfirmPurchaseInvoice()
+  const createProduct = useCreateProduct()
+  const updateProduct = useUpdateProduct()
 
   const resetState = () => {
     setStep("upload")
@@ -249,7 +254,8 @@ export function SellerBillDialog({
 
     setIsProcessing(true)
     try {
-      if (invoiceId) {
+      let savedViaInvoice = false
+      if (invoiceId && typeof invoiceId === "number" && invoiceId < 1000000000000) {
         try {
           await confirmInvoice.mutateAsync({
             id: invoiceId,
@@ -267,12 +273,43 @@ export function SellerBillDialog({
               })),
             },
           })
+          savedViaInvoice = true
         } catch (err) {
-          console.warn("Backend confirmation fallback:", err)
+          console.warn("Backend invoice confirmation fallback:", err)
+        }
+      }
+
+      // Fallback direct product inventory upsert if invoice confirm was not used
+      if (!savedViaInvoice) {
+        for (const it of items) {
+          if (it.matchedProductId) {
+            const existing = existingProducts.find((p) => p.id === it.matchedProductId)
+            const currentStock = existing ? Number(existing.stock) : 0
+            await updateProduct.mutateAsync({
+              id: it.matchedProductId,
+              data: {
+                stock: currentStock + it.quantity,
+                costPrice: it.unitCost,
+                price: it.sellPrice || (existing ? Number(existing.price) : Math.round(it.unitCost * 1.15)),
+              },
+            })
+          } else {
+            await createProduct.mutateAsync({
+              data: {
+                name: it.name,
+                stock: it.quantity,
+                costPrice: it.unitCost,
+                price: it.sellPrice || Math.round(it.unitCost * 1.15),
+                unit: it.unit || "পিস",
+                category: it.category || "সাধারণ",
+              },
+            })
+          }
         }
       }
 
       queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() })
+      queryClient.invalidateQueries({ queryKey: getGetDashboardOverviewQueryKey() })
       setStep("success")
       toast({ title: "সফলভাবে ইনভেন্টরি আপডেট হয়েছে!" })
     } catch (err) {

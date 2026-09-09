@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
 import { useShopTheme } from "@/context/shop-theme-context"
+import { useLanguage } from "@/context/language-context"
 import { useChouPresence } from "@/context/chou-presence-context"
 import { useLocation } from "wouter"
 import {
@@ -74,14 +75,17 @@ function looseIncludes(haystack: string, needle: string): boolean {
   return n.length > 0 && h.includes(n)
 }
 
-const HELP_TEXT =
-  "মামা, আপনি জিজ্ঞেস করতে পারেন: 'আজকের বিক্রি কত', 'মোট বাকি কত', '[নাম] এর বাকি কত', '[প্রোডাক্ট] এর স্টক কত', 'কোন প্রোডাক্ট স্টকে কম আছে', 'সবচেয়ে বেশি বিক্রি হওয়া প্রোডাক্ট'। এছাড়া বলতে পারেন: '২ কেজি চাল বিক্রি করলাম নগদে', অথবা 'রহিম ৫০০ টাকা দিলো'।"
+const HELP_TEXT_BN =
+  "মামা, আপনি জিজ্ঞেস করতে পারেন: 'আজকের বিক্রি কত', 'মোট বাকি কত', '[নাম] এর বাকি কত', '[প্রোডাক্ট] এর স্টক কত', 'কোন প্রোডাক্ট স্টকে কম আছে', 'সবচেয়ে বেশি বিক্রি হওয়া প্রোডাক্ট'। এছাড়া বলতে পারেন: 'বিলিং পেজ খোল', অথবা 'রহিম ৫০০ টাকা দিলো'।"
+const HELP_TEXT_EN =
+  "Ask me: 'today's sales', 'total due', 'stock of [product]', 'low stock products', 'top selling products', 'open billing', 'open inventory', or 'Rahim paid 500'."
 
 export function VoiceAssistant() {
   const [, setLocation] = useLocation()
   const { toast } = useToast()
   const queryClient = useQueryClient()
-  const { category } = useShopTheme()
+  const { category, role, isOwner, isManager, isShopkeeper } = useShopTheme()
+  const { language } = useLanguage()
   const { position, setPosition, setPose } = useChouPresence()
 
   // Dragging refs
@@ -134,9 +138,140 @@ export function VoiceAssistant() {
     queryClient.invalidateQueries({ queryKey: getGetCashboxStateQueryKey() })
   }
 
+  // Cleanly start speech recognition with permission check and fresh instance
+  const startListening = async () => {
+    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
+      setNotSupported(true)
+      toast({
+        title: language === "en" ? "Speech recognition not supported" : "ব্রাউজারে ভয়েস সাপোর্ট নেই",
+        description: language === "en" ? "Please use Google Chrome or Edge, or type your query below." : "Google Chrome বা Edge ব্যবহার করুন, অথবা নিচে লিখে প্রশ্ন করুন।",
+      })
+      return
+    }
+
+    // Request mic access first to trigger browser permission modal if not allowed yet
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        stream.getTracks().forEach((t) => t.stop())
+      } catch (err: any) {
+        console.warn("Microphone access prompt error:", err)
+        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+          toast({
+            title: language === "en" ? "Microphone permission required" : "মাইক্রোফোন পারমিশন এলাও করুন",
+            description: language === "en" ? "Please enable microphone permission in your browser address bar." : "ব্রাউজারের অ্যাড্রেস বার থেকে মাইক্রোফোন পারমিশন চালু করুন।",
+            variant: "destructive",
+          })
+          return
+        }
+      }
+    }
+
+    // Clean up any ongoing recognition or speech
+    window.speechSynthesis.cancel()
+    stopKeepAlive()
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort()
+      } catch {}
+      recognitionRef.current = null
+    }
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    const recognition = new SpeechRecognition()
+    recognition.lang = language === "en" ? "en-US" : "bn-BD"
+    recognition.continuous = false
+    recognition.interimResults = true
+    recognition.maxAlternatives = 3
+
+    setTranscript("")
+    setResponse("")
+    setIsOpen(true)
+    setIsListening(true)
+    setChotuState("listening")
+    setPose("listening", "curious")
+
+    recognition.onstart = () => {
+      setIsListening(true)
+      setChotuState("listening")
+      setPose("listening", "curious")
+    }
+
+    recognition.onresult = (event: any) => {
+      const current = event.resultIndex
+      const result = event.results[current][0].transcript
+      setTranscript(result)
+      if (event.results[current].isFinal) {
+        try {
+          recognition.stop()
+        } catch {}
+        void processCommand(result)
+      }
+    }
+
+    recognition.onerror = (event: any) => {
+      console.warn("Speech recognition error:", event.error)
+      setIsListening(false)
+      if (event.error === "no-speech") {
+        setChotuState("idle")
+        setPose("idle", "happy")
+        return
+      }
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+        toast({
+          title: language === "en" ? "Microphone blocked" : "মাইক্রোফোন বন্ধ আছে",
+          description: language === "en" ? "Please allow microphone access to talk to Chotu." : "ছোটুর সাথে কথা বলতে মাইক্রোফোন পারমিশন অন করুন।",
+          variant: "destructive",
+        })
+      } else if (event.error === "language-not-supported" || event.error === "network") {
+        // Retry once with en-US if bn-BD package is missing on Windows
+        if (!langFallbackRef.current) {
+          langFallbackRef.current = true
+          recognition.lang = "en-US"
+          try {
+            recognition.start()
+            return
+          } catch {}
+        }
+      }
+      triggerErrorState()
+    }
+
+    recognition.onend = () => {
+      setIsListening(false)
+      recognitionRef.current = null
+    }
+
+    try {
+      recognition.start()
+      recognitionRef.current = recognition
+    } catch (e) {
+      console.error("Failed to start speech recognition:", e)
+      setIsListening(false)
+      recognitionRef.current = null
+    }
+  }
+
+  const stopListening = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop()
+      } catch {}
+      recognitionRef.current = null
+    }
+    setIsListening(false)
+    setChotuState("idle")
+    setPose("idle", "happy")
+  }
+
   useEffect(() => {
     const handleToggleVoice = () => {
-      toggleListening()
+      if (isListening) {
+        stopListening()
+      } else {
+        void startListening()
+      }
     }
     const handleOpenPanel = () => {
       setIsOpen(true)
@@ -147,81 +282,27 @@ export function VoiceAssistant() {
       window.removeEventListener("chotu:toggle_voice", handleToggleVoice)
       window.removeEventListener("chotu:open_panel", handleOpenPanel)
     }
-  }, [notSupported, isListening])
+  }, [notSupported, isListening, language])
 
   const triggerSuccessState = () => {
     setChotuState("success")
+    setPose("sale_done", "excited")
     if (successTimerRef.current) window.clearTimeout(successTimerRef.current)
     successTimerRef.current = window.setTimeout(() => {
       setChotuState("idle")
+      setPose("idle", "happy")
     }, 2800)
   }
 
   const triggerErrorState = () => {
     setChotuState("error")
+    setPose("low_stock", "concerned")
     if (successTimerRef.current) window.clearTimeout(successTimerRef.current)
     successTimerRef.current = window.setTimeout(() => {
       setChotuState("idle")
+      setPose("idle", "happy")
     }, 3000)
   }
-
-  // Voice Recognition Setup
-  useEffect(() => {
-    if (!("webkitSpeechRecognition" in window) && !("SpeechRecognition" in window)) {
-      setNotSupported(true)
-      return
-    }
-
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    const recognition = new SpeechRecognition()
-    recognition.lang = chotuConfig.language === "en" ? "en-US" : "bn-BD"
-    recognition.continuous = false
-    recognition.interimResults = true
-    recognition.maxAlternatives = 3
-
-    recognition.onresult = (event: any) => {
-      const current = event.resultIndex
-      const result = event.results[current][0].transcript
-      setTranscript(result)
-      const alternatives: string[] = []
-      for (let i = 0; i < event.results[current].length; i++) {
-        alternatives.push(event.results[current][i].transcript)
-      }
-      if (event.results[current].isFinal) {
-        processedRef.current = true
-        void processCommand(result)
-      }
-    }
-
-    recognition.onerror = (event: any) => {
-      console.error("Speech recognition error", event.error)
-      if (event.error === "no-speech") {
-        setIsListening(false)
-        return
-      }
-      if (event.error === "language-not-supported" && !langFallbackRef.current) {
-        langFallbackRef.current = true
-        recognition.lang = "en-US"
-        try {
-          recognition.start()
-          return
-        } catch {}
-      }
-      setIsListening(false)
-      triggerErrorState()
-    }
-
-    recognition.onend = () => {
-      setIsListening(false)
-    }
-
-    recognitionRef.current = recognition
-
-    return () => {
-      recognition.stop()
-    }
-  }, [chotuConfig.language])
 
   // Dragging Handlers
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -317,9 +398,9 @@ export function VoiceAssistant() {
 
     const voice = await resolveVoice()
     const utterance = new SpeechSynthesisUtterance(text)
-    utterance.lang = "bn-BD"
+    utterance.lang = language === "en" ? "en-US" : "bn-BD"
     utterance.rate = 0.95
-    if (voice) utterance.voice = voice
+    if (voice && language === "bn") utterance.voice = voice
 
     utterance.onstart = () => {
       setIsSpeaking(true)
@@ -340,6 +421,19 @@ export function VoiceAssistant() {
 
   // Personality Prefix / Salutation
   const getPersonalityGreeting = (): string => {
+    if (language === "en") {
+      switch (chotuConfig.personality) {
+        case "funny":
+          return "Hey Boss! "
+        case "helpful":
+          return "I'm checking! "
+        case "smart":
+          return "According to real-time data, "
+        case "friendly":
+        default:
+          return "Boss, "
+      }
+    }
     switch (chotuConfig.personality) {
       case "funny":
         return "আরে মামা! "
@@ -376,18 +470,20 @@ export function VoiceAssistant() {
 
       // 2. Handle Low Confidence (Politely ask user to rephrase)
       if (parsed.confidence === "LOW") {
-        reply = parsed.clarificationQuestion || "মামা, কথাটা বুঝতে পারিনি। অনুগ্রহ করে আরেকটু স্পষ্ট করে বলুন।"
+        reply = parsed.clarificationQuestion || (language === "en" ? "Sorry, I couldn't understand that. Please say it clearly." : "মামা, কথাটা বুঝতে পারিনি। অনুগ্রহ করে আরেকটু স্পষ্ট করে বলুন।")
         triggerErrorState()
       }
       // 3. Handle Medium Confidence (Ask specific clarification question)
       else if (parsed.confidence === "MEDIUM") {
-        reply = parsed.clarificationQuestion || "মামা, একটু নির্দিষ্ট করে বলুন কী দেখতে চান।"
+        reply = parsed.clarificationQuestion || (language === "en" ? "Please specify what you want to check." : "মামা, একটু নির্দিষ্ট করে বলুন কী দেখতে চান।")
       }
       // 4. Handle High Confidence - Dispatch to Fixed Predefined Dokandar Mama Command
       else {
         switch (parsed.intent) {
           case "GENERAL_GREETING": {
-            reply = `${getPersonalityGreeting()}আমি আপনার সাথে আছি। আজকের বিক্রি, স্টক, বাকি বা ক্যাশ বক্স সম্পর্কে জিজ্ঞেস করতে পারেন।`
+            reply = language === "en"
+              ? `${getPersonalityGreeting()}I'm here to help! Ask me about today's sales, stock, baki, or cashbox.`
+              : `${getPersonalityGreeting()}আমি আপনার সাথে আছি। আজকের বিক্রি, স্টক, বাকি বা ক্যাশ বক্স সম্পর্কে জিজ্ঞেস করতে পারেন।`
             success = true
             break
           }
@@ -395,14 +491,18 @@ export function VoiceAssistant() {
           case "CHECK_SALES_SUMMARY": {
             const total = dashboard?.todaySalesTotal ?? 0
             const count = dashboard?.todayTransactionCount ?? 0
-            reply = `${getPersonalityGreeting()}আজকে মোট ${count} টি বিক্রয়ে ৳${total} টাকা বিক্রি হয়েছে।`
+            reply = language === "en"
+              ? `${getPersonalityGreeting()}Today's sales: ৳${total} from ${count} transactions.`
+              : `${getPersonalityGreeting()}আজকে মোট ${count} টি বিক্রয়ে ৳${total} টাকা বিক্রি হয়েছে।`
             success = true
             break
           }
 
           case "CHECK_CASHBOX": {
             const balance = (dashboard as any)?.cashBalance ?? cashbox?.expectedClosing ?? cashbox?.session?.openingBalance ?? 0
-            reply = `${getPersonalityGreeting()}ক্যাশ বাক্সে বর্তমানে ৳${balance} টাকা আছে।`
+            reply = language === "en"
+              ? `${getPersonalityGreeting()}Current cash in drawer is ৳${balance}.`
+              : `${getPersonalityGreeting()}ক্যাশ বাক্সে বর্তমানে ৳${balance} টাকা আছে।`
             success = true
             break
           }
@@ -412,19 +512,21 @@ export function VoiceAssistant() {
             const breakdown = (dashboard as any)?.digitalBreakdown || {}
             if (provider === "bkash") {
               const amount = breakdown.bkash ?? 0
-              reply = `${getPersonalityGreeting()}বিকাশে মোট ৳${amount} টাকা ডিজিটাল পেমেন্ট জমা আছে।`
+              reply = language === "en" ? `${getPersonalityGreeting()}bKash balance is ৳${amount}.` : `${getPersonalityGreeting()}বিকাশে মোট ৳${amount} টাকা ডিজিটাল পেমেন্ট জমা আছে।`
             } else if (provider === "nagad") {
               const amount = breakdown.nagad ?? 0
-              reply = `${getPersonalityGreeting()}নগদে মোট ৳${amount} টাকা ডিজিটাল পেমেন্ট জমা আছে।`
+              reply = language === "en" ? `${getPersonalityGreeting()}Nagad balance is ৳${amount}.` : `${getPersonalityGreeting()}নগদে মোট ৳${amount} টাকা ডিজিটাল পেমেন্ট জমা আছে।`
             } else if (provider === "rocket") {
               const amount = breakdown.rocket ?? 0
-              reply = `${getPersonalityGreeting()}রকেটে মোট ৳${amount} টাকা ডিজিটাল পেমেন্ট জমা আছে।`
+              reply = language === "en" ? `${getPersonalityGreeting()}Rocket balance is ৳${amount}.` : `${getPersonalityGreeting()}রকেটে মোট ৳${amount} টাকা ডিজিটাল পেমেন্ট জমা আছে।`
             } else if (provider === "upay") {
               const amount = breakdown.upay ?? 0
-              reply = `${getPersonalityGreeting()}উপায়ে মোট ৳${amount} টাকা ডিজিটাল পেমেন্ট জমা আছে।`
+              reply = language === "en" ? `${getPersonalityGreeting()}Upay balance is ৳${amount}.` : `${getPersonalityGreeting()}উপায়ে মোট ৳${amount} টাকা ডিজিটাল পেমেন্ট জমা আছে।`
             } else {
               const totalDigital = (dashboard as any)?.digitalBalance ?? 0
-              reply = `${getPersonalityGreeting()}মোট ডিজিটাল ব্যালেন্স ৳${totalDigital} টাকা (বিকাশ: ৳${breakdown.bkash ?? 0}, নগদ: ৳${breakdown.nagad ?? 0})।`
+              reply = language === "en"
+                ? `${getPersonalityGreeting()}Total digital balance is ৳${totalDigital} (bKash: ৳${breakdown.bkash ?? 0}, Nagad: ৳${breakdown.nagad ?? 0}).`
+                : `${getPersonalityGreeting()}মোট ডিজিটাল ব্যালেন্স ৳${totalDigital} টাকা (বিকাশ: ৳${breakdown.bkash ?? 0}, নগদ: ৳${breakdown.nagad ?? 0})।`
             }
             success = true
             break
@@ -434,7 +536,9 @@ export function VoiceAssistant() {
             const totalBalance = (dashboard as any)?.totalCurrentBalance ?? 0
             const cash = (dashboard as any)?.cashBalance ?? 0
             const digital = (dashboard as any)?.digitalBalance ?? 0
-            reply = `${getPersonalityGreeting()}দোকানে বর্তমানে মোট ৳${totalBalance} টাকা ব্যালেন্স আছে (ক্যাশ: ৳${cash}, ডিজিটাল: ৳${digital})।`
+            reply = language === "en"
+              ? `${getPersonalityGreeting()}Total shop balance is ৳${totalBalance} (Cash: ৳${cash}, Digital: ৳${digital}).`
+              : `${getPersonalityGreeting()}দোকানে বর্তমানে মোট ৳${totalBalance} টাকা ব্যালেন্স আছে (ক্যাশ: ৳${cash}, ডিজিটাল: ৳${digital})।`
             success = true
             break
           }
@@ -444,9 +548,13 @@ export function VoiceAssistant() {
             const lowItems = products?.filter((p: any) => p.stock <= p.lowStockThreshold) || []
             if (lowItems.length > 0) {
               const names = lowItems.slice(0, 3).map((p: any) => p.name).join(", ")
-              reply = `${getPersonalityGreeting()}${lowCount} টি পণ্যের স্টক কম: ${names}${lowItems.length > 3 ? " ইত্যাদি" : ""}।`
+              reply = language === "en"
+                ? `${getPersonalityGreeting()}${lowCount} products low on stock: ${names}${lowItems.length > 3 ? " etc." : ""}.`
+                : `${getPersonalityGreeting()}${lowCount} টি পণ্যের স্টক কম: ${names}${lowItems.length > 3 ? " ইত্যাদি" : ""}।`
             } else {
-              reply = `${getPersonalityGreeting()}সব পণ্যের পর্যাপ্ত স্টক আছে, কোনো ঘাটতি নেই।`
+              reply = language === "en"
+                ? `${getPersonalityGreeting()}All products have sufficient stock!`
+                : `${getPersonalityGreeting()}সব পণ্যের পর্যাপ্ত স্টক আছে, কোনো ঘাটতি নেই।`
             }
             success = true
             break
@@ -456,9 +564,13 @@ export function VoiceAssistant() {
             if (topProducts && topProducts.length > 0) {
               const topName = topProducts[0].productName
               const topSold = topProducts[0].quantitySold
-              reply = `${getPersonalityGreeting()}সবচেয়ে বেশি বিক্রি হয়েছে ${topName} (${topSold} টি)।`
+              reply = language === "en"
+                ? `${getPersonalityGreeting()}Top selling item is ${topName} (${topSold} sold).`
+                : `${getPersonalityGreeting()}সবচেয়ে বেশি বিক্রি হয়েছে ${topName} (${topSold} টি)।`
             } else {
-              reply = `${getPersonalityGreeting()}এই মুহূর্তে টপ বিক্রির ডাটা পাওয়া যায়নি।`
+              reply = language === "en"
+                ? `${getPersonalityGreeting()}No top product data available right now.`
+                : `${getPersonalityGreeting()}এই মুহূর্তে টপ বিক্রির ডাটা পাওয়া যায়নি।`
             }
             success = true
             break
@@ -467,7 +579,7 @@ export function VoiceAssistant() {
           case "CHECK_STOCK": {
             const target = parsed.parameters.productName?.toLowerCase() || ""
             if (!target) {
-              reply = "মামা, কোন পণ্যের স্টক জানতে চান?"
+              reply = language === "en" ? "Which product's stock would you like to check?" : "মামা, কোন পণ্যের স্টক জানতে চান?"
               break
             }
             const matched = products?.find(
@@ -478,15 +590,19 @@ export function VoiceAssistant() {
               const threshold = Number(matched.lowStockThreshold ?? 5)
               let stockWarning = ""
               if (currentStock <= threshold) {
-                stockWarning = " স্টক শেষের দিকে, দ্রুত কিনতে হবে।"
+                stockWarning = language === "en" ? " Stock is low, reorder soon." : " স্টক শেষের দিকে, দ্রুত কিনতে হবে।"
               } else if (currentStock - threshold <= 3) {
                 const diff = currentStock - threshold
-                stockWarning = ` আর ${diff} ${matched.unit} বিক্রি হলেই স্টক কমে যাবে।`
+                stockWarning = language === "en" ? ` Only ${diff} ${matched.unit} left before low stock.` : ` আর ${diff} ${matched.unit} বিক্রি হলেই স্টক কমে যাবে।`
               }
-              reply = `${getPersonalityGreeting()}${matched.name} ${matched.stock} ${matched.unit} আছে।${stockWarning}`
+              reply = language === "en"
+                ? `${getPersonalityGreeting()}${matched.name} has ${matched.stock} ${matched.unit} in stock.${stockWarning}`
+                : `${getPersonalityGreeting()}${matched.name} ${matched.stock} ${matched.unit} আছে।${stockWarning}`
               success = true
             } else {
-              reply = `মামা, "${parsed.parameters.productName}" নামের কোনো পণ্য দোকানে পাওয়া যায়নি।`
+              reply = language === "en"
+                ? `No product named "${parsed.parameters.productName}" found in stock.`
+                : `মামা, "${parsed.parameters.productName}" নামের কোনো পণ্য দোকানে পাওয়া যায়নি।`
             }
             break
           }
@@ -495,7 +611,9 @@ export function VoiceAssistant() {
             const target = parsed.parameters.customerName?.toLowerCase() || ""
             if (!target) {
               const totalDue = dashboard?.totalDue ?? 0
-              reply = `${getPersonalityGreeting()}দোকানের মোট বকেয়া বাকি ৳${totalDue} টাকা।`
+              reply = language === "en"
+                ? `${getPersonalityGreeting()}Total customer due (baki) is ৳${totalDue}.`
+                : `${getPersonalityGreeting()}দোকানের মোট বকেয়া বাকি ৳${totalDue} টাকা।`
               success = true
               break
             }
@@ -503,10 +621,14 @@ export function VoiceAssistant() {
               (c: any) => c.name.toLowerCase().includes(target) || target.includes(c.name.toLowerCase())
             )
             if (matched) {
-              reply = `${getPersonalityGreeting()}${matched.name}-এর বাকি আছে ৳${matched.bakiBalance} টাকা।`
+              reply = language === "en"
+                ? `${getPersonalityGreeting()}${matched.name} owes ৳${matched.bakiBalance}.`
+                : `${getPersonalityGreeting()}${matched.name}-এর বাকি আছে ৳${matched.bakiBalance} টাকা।`
               success = true
             } else {
-              reply = `মামা, "${parsed.parameters.customerName}" নামের কোনো কাস্টমার তালিকায় নেই।`
+              reply = language === "en"
+                ? `No customer named "${parsed.parameters.customerName}" found.`
+                : `মামা, "${parsed.parameters.customerName}" নামের কোনো কাস্টমার তালিকায় নেই।`
             }
             break
           }
@@ -524,13 +646,19 @@ export function VoiceAssistant() {
                   data: { amount, note: "ছোটু ভয়েস এন্ট্রি" },
                 })
                 invalidateShopData()
-                reply = `${getPersonalityGreeting()}${matched.name}-এর ৳${amount} টাকা জমা নেওয়া হয়েছে।`
+                reply = language === "en"
+                  ? `${getPersonalityGreeting()}Recorded ৳${amount} payment for ${matched.name}.`
+                  : `${getPersonalityGreeting()}${matched.name}-এর ৳${amount} টাকা জমা নেওয়া হয়েছে।`
                 success = true
               } else {
-                reply = `মামা, "${parsed.parameters.customerName}" নামের কাস্টমার পাওয়া যায়নি।`
+                reply = language === "en"
+                  ? `Customer "${parsed.parameters.customerName}" was not found.`
+                  : `মামা, "${parsed.parameters.customerName}" নামের কাস্টমার পাওয়া যায়নি।`
               }
             } else {
-              reply = "মামা, কাস্টমারের নাম এবং টাকার পরিমাণ পরিষ্কার করে বলুন।"
+              reply = language === "en"
+                ? "Please clearly say the customer name and payment amount."
+                : "মামা, কাস্টমারের নাম এবং টাকার পরিমাণ পরিষ্কার করে বলুন।"
             }
             break
           }
@@ -539,32 +667,42 @@ export function VoiceAssistant() {
             const page = parsed.parameters.targetPage
             if (page === "billing") {
               setLocation("/app/billing")
-              reply = `${getPersonalityGreeting()}বিলিং পেজ ওপেন করেছি।`
+              reply = language === "en" ? `${getPersonalityGreeting()}Opened billing page.` : `${getPersonalityGreeting()}বিলিং পেজ ওপেন করেছি।`
             } else if (page === "inventory") {
               setLocation("/app/inventory")
-              reply = `${getPersonalityGreeting()}ইনভেন্টরি পেজ ওপেন করেছি।`
+              reply = language === "en" ? `${getPersonalityGreeting()}Opened inventory page.` : `${getPersonalityGreeting()}ইনভেন্টরি পেজ ওপেন করেছি।`
             } else if (page === "customers") {
               setLocation("/app/customers")
-              reply = `${getPersonalityGreeting()}কাস্টমার তালিকা ওপেন করেছি।`
+              reply = language === "en" ? `${getPersonalityGreeting()}Opened customer list.` : `${getPersonalityGreeting()}কাস্টমার তালিকা ওপেন করেছি।`
             } else if (page === "reports") {
-              setLocation("/app/reports")
-              reply = `${getPersonalityGreeting()}রিপোর্ট পেজ ওপেন করেছি।`
+              if (isShopkeeper) {
+                reply = language === "en" ? "Reports are restricted to Managers and Owners." : "মামা, রিপোর্ট দেখার অনুমতি শুধুমাত্র ম্যানেজার বা মালিকের আছে।"
+              } else {
+                setLocation("/app/reports")
+                reply = language === "en" ? `${getPersonalityGreeting()}Opened reports page.` : `${getPersonalityGreeting()}রিপোর্ট পেজ ওপেন করেছি।`
+              }
+            } else if (page === "cashbox") {
+              setLocation("/app/cashbox")
+              reply = language === "en" ? `${getPersonalityGreeting()}Opened cashbox.` : `${getPersonalityGreeting()}ক্যাশ বক্স পেজ ওপেন করেছি।`
             } else {
-              reply = `${getPersonalityGreeting()}পেজ ওপেন করা হয়েছে।`
+              setLocation("/app")
+              reply = language === "en" ? `${getPersonalityGreeting()}Opened dashboard.` : `${getPersonalityGreeting()}ড্যাশবোর্ড ওপেন করেছি।`
             }
             success = true
             break
           }
 
           default: {
-            reply = `${getPersonalityGreeting()}আমি আপনার কথা শুনেছি ("${rawText}")। আজকের বিক্রি, মোট বাকি বা স্টক সম্পর্কে জানতে পারেন।`
+            reply = language === "en"
+              ? `${getPersonalityGreeting()}I heard: "${rawText}". You can ask about today's sales, due, or stock.`
+              : `${getPersonalityGreeting()}আমি আপনার কথা শুনেছি ("${rawText}")। আজকের বিক্রি, মোট বাকি বা স্টক সম্পর্কে জানতে পারেন।`
             success = true
           }
         }
       }
     } catch (e) {
       console.error("Command execution error", e)
-      reply = "মামা, কাজটি সম্পন্ন করতে সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।"
+      reply = language === "en" ? "Sorry, there was an error processing that request." : "মামা, কাজটি সম্পন্ন করতে সমস্যা হয়েছে। দয়া করে আবার চেষ্টা করুন।"
       triggerErrorState()
     }
 
@@ -575,31 +713,27 @@ export function VoiceAssistant() {
   }
 
   const toggleListening = () => {
-    if (notSupported) return
-
     if (isListening) {
-      recognitionRef.current?.stop()
-      setIsListening(false)
+      stopListening()
     } else {
-      setTranscript("")
-      setResponse("")
-      processedRef.current = false
-      setIsOpen(true)
-      try {
-        recognitionRef.current?.start()
-        setIsListening(true)
-      } catch (e) {
-        console.error("Failed to start listening", e)
-      }
+      void startListening()
     }
+  }
+
+  const [textInput, setTextInput] = useState("")
+
+  const handleTextSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!textInput.trim() || isActing) return
+    const q = textInput.trim()
+    setTextInput("")
+    setTranscript(q)
+    void processCommand(q)
   }
 
   const closePanel = () => {
     setIsOpen(false)
-    if (isListening) {
-      recognitionRef.current?.stop()
-      setIsListening(false)
-    }
+    stopListening()
     window.speechSynthesis.cancel()
     stopKeepAlive()
   }
@@ -630,7 +764,7 @@ export function VoiceAssistant() {
         <div
           style={{
             right: `${Math.min(window.innerWidth - 340, Math.max(16, position.x))}px`,
-            bottom: `${Math.min(window.innerHeight - 380, Math.max(80, position.y + 70))}px`,
+            bottom: `${Math.min(window.innerHeight - 440, Math.max(80, position.y + 70))}px`,
           }}
           className="fixed w-80 max-w-[calc(100vw-32px)] bg-card/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-primary/20 p-4 z-[95] animate-in zoom-in-95 slide-in-from-bottom-4 duration-200"
         >
@@ -687,7 +821,7 @@ export function VoiceAssistant() {
           </div>
 
           {/* Conversation Speech Area */}
-          <div className="min-h-[70px] max-h-44 overflow-y-auto bg-muted/40 rounded-2xl p-3 mb-3 text-xs flex flex-col justify-end border border-border/50">
+          <div className="min-h-[70px] max-h-44 overflow-y-auto bg-muted/40 rounded-2xl p-3 mb-2.5 text-xs flex flex-col justify-end border border-border/50">
             {transcript && (
               <p className="text-muted-foreground text-right mb-1.5 italic font-medium">
                 "{transcript}"
@@ -706,7 +840,7 @@ export function VoiceAssistant() {
             )}
             {!isListening && !transcript && !response && (
               <div className="space-y-2 text-muted-foreground">
-                <p>{HELP_TEXT}</p>
+                <p>{language === "en" ? HELP_TEXT_EN : HELP_TEXT_BN}</p>
                 <div className="pt-2 border-t border-border/40">
                   <p className="text-[11px] font-bold text-primary mb-1.5 flex items-center gap-1">
                     <Sparkles className="h-3 w-3" /> দ্রুত প্রশ্ন করুন:
@@ -726,6 +860,26 @@ export function VoiceAssistant() {
               </div>
             )}
           </div>
+
+          {/* Text Input Option for quick typing */}
+          <form onSubmit={handleTextSubmit} className="flex items-center gap-1.5 mb-2.5">
+            <input
+              type="text"
+              value={textInput}
+              onChange={(e) => setTextInput(e.target.value)}
+              placeholder={language === "en" ? "Ask Chotu or type command..." : "ছোটুকে লিখেও জিজ্ঞেস করতে পারেন..."}
+              className="flex-1 h-9 px-3 rounded-xl bg-muted/60 border border-border/60 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
+              disabled={isActing}
+            />
+            <Button
+              type="submit"
+              size="sm"
+              className="h-9 px-3 rounded-xl text-xs font-bold"
+              disabled={!textInput.trim() || isActing}
+            >
+              পাঠান
+            </Button>
+          </form>
 
           {/* Quick Action Buttons Grid */}
           <div className="grid grid-cols-4 gap-1.5 mb-2.5">
@@ -782,11 +936,11 @@ export function VoiceAssistant() {
             {isActing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : isListening ? (
-              <MicOff className="h-4 w-4" />
+              <MicOff className="h-4 w-4 animate-pulse" />
             ) : (
               <Mic className="h-4 w-4" />
             )}
-            {isActing ? "ছোটু কাজ করছে..." : isListening ? "কথা বলা শেষ" : "ভয়েসে কথা বলুন"}
+            {isActing ? "ছোটু কাজ করছে..." : isListening ? "কথা বলা শেষ (ট্যাপ করুন)" : "ভয়েসে কথা বলুন"}
           </Button>
         </div>
       )}

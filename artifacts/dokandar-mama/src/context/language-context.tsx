@@ -18,6 +18,7 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
     "nav.customers": "কাস্টমার ও বাকি",
     "nav.cashbox": "ক্যাশ বক্স",
     "nav.reports": "রিপোর্ট",
+    "nav.management": "ম্যানেজমেন্ট",
     "nav.settings": "সেটিংস",
     "nav.assistant": "ছোটু মামা",
 
@@ -53,6 +54,10 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
     "btn.save": "সংরক্ষণ",
     "btn.cancel": "বাতিল",
     "btn.confirm": "কনফার্ম",
+    "btn.add": "যোগ করুন",
+    "btn.delete": "মুছুন",
+    "btn.edit": "সম্পাদনা",
+    "btn.export": "ডাউনলোড",
   },
   en: {
     // Navigation
@@ -62,6 +67,7 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
     "nav.customers": "Customers & Due",
     "nav.cashbox": "Cash Box",
     "nav.reports": "Reports",
+    "nav.management": "Management",
     "nav.settings": "Settings",
     "nav.assistant": "Chotu Assistant",
 
@@ -97,6 +103,10 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
     "btn.save": "Save",
     "btn.cancel": "Cancel",
     "btn.confirm": "Confirm",
+    "btn.add": "Add",
+    "btn.delete": "Delete",
+    "btn.edit": "Edit",
+    "btn.export": "Export",
   },
 }
 

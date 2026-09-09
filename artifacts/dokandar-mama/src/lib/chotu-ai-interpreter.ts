@@ -66,14 +66,14 @@ export function matchLocalIntent(rawText: string): ChotuParsedResult | null {
 
   // 1. GREETING
   if (
-    /^(হ্যালো|হাই|সালাম|আসসালামু|নমস্কার|হ্যালো ছোটু|ছোটু মামা|hi|hello|hey|chotu)\b/.test(text) &&
-    text.split(" ").length <= 3
+    /^(হ্যালো|হাই|সালাম|আসসালামু|নমস্কার|হ্যালো ছোটু|ছোটু মামা|hi|hello|hey|chotu|dokandar mama)\b/i.test(text) &&
+    text.split(" ").length <= 4
   ) {
     return {
       intent: "GENERAL_GREETING",
       confidence: "HIGH",
       parameters: {},
-      spokenFeedback: "কীভাবে সাহায্য করতে পারি মামা?",
+      spokenFeedback: "কীভাবে সাহায্য করতে পারি মামা? / How can I help you?",
     }
   }
 
@@ -97,7 +97,8 @@ export function matchLocalIntent(rawText: string): ChotuParsedResult | null {
       text.includes("balance") ||
       text.includes("koto") ||
       text.includes("ase") ||
-      text.includes("আছে")
+      text.includes("আছে") ||
+      text.includes("how much")
     ) {
       let provider = "all"
       if (text.includes("বিকাশ") || text.includes("bkash")) provider = "bkash"
@@ -118,6 +119,7 @@ export function matchLocalIntent(rawText: string): ChotuParsedResult | null {
     (text.includes("দোকানে") && (text.includes("কত") || text.includes("টাকা") || text.includes("হিসাব"))) ||
     (text.includes("মোট") && (text.includes("টাকা") || text.includes("ব্যালেন্স") || text.includes("balance") || text.includes("টাকা আছে"))) ||
     text.includes("total balance") ||
+    text.includes("shop balance") ||
     text.includes("dokane koto taka")
   ) {
     return {
@@ -132,7 +134,9 @@ export function matchLocalIntent(rawText: string): ChotuParsedResult | null {
     text.includes("ক্যাশ") ||
     text.includes("cash") ||
     text.includes("ড্রয়ার") ||
+    text.includes("drawer") ||
     text.includes("বাক্স") ||
+    text.includes("cashbox") ||
     text.includes("kash")
   ) {
     if (
@@ -142,8 +146,17 @@ export function matchLocalIntent(rawText: string): ChotuParsedResult | null {
       text.includes("balance") ||
       text.includes("koto") ||
       text.includes("status") ||
-      text.includes("dekhao")
+      text.includes("dekhao") ||
+      text.includes("open") ||
+      text.includes("খোল")
     ) {
+      if (text.includes("open") || text.includes("খোল") || text.includes("পেজ") || text.includes("page")) {
+        return {
+          intent: "OPEN_PAGE",
+          confidence: "HIGH",
+          parameters: { targetPage: "cashbox" },
+        }
+      }
       return {
         intent: "CHECK_CASHBOX",
         confidence: "HIGH",
@@ -154,15 +167,17 @@ export function matchLocalIntent(rawText: string): ChotuParsedResult | null {
 
   // 3. SALES / TODAY SUMMARY
   if (
-    text.includes("বিক্রি") ||
     text.includes("আজকের বিক্রি") ||
-    text.includes("bikri") ||
-    text.includes("sell") ||
-    text.includes("sales") ||
+    text.includes("today's sales") ||
+    text.includes("today sales") ||
+    text.includes("todays sales") ||
+    text.includes("ajker bikri") ||
     text.includes("আজকের হিসাব") ||
     text.includes("ajker hisab") ||
     text.includes("আজকে কত হলো") ||
-    text.includes("মোট বিক্রি")
+    text.includes("total sales today") ||
+    (text.includes("বিক্রি") && (text.includes("কত") || text.includes("হিসাব") || text.includes("আজকে"))) ||
+    (text.includes("sales") && (text.includes("today") || text.includes("summary") || text.includes("how much")))
   ) {
     return {
       intent: "CHECK_SALES_SUMMARY",
@@ -171,7 +186,7 @@ export function matchLocalIntent(rawText: string): ChotuParsedResult | null {
     }
   }
 
-  // 4. RESTOCK / SHORTAGE
+  // 4. RESTOCK / SHORTAGE / LOW STOCK
   if (
     text.includes("ঘাটতি") ||
     text.includes("কম স্টক") ||
@@ -179,6 +194,8 @@ export function matchLocalIntent(rawText: string): ChotuParsedResult | null {
     text.includes("কম আছে") ||
     text.includes("restock") ||
     text.includes("low stock") ||
+    text.includes("out of stock") ||
+    text.includes("shortage") ||
     text.includes("kena lagbe") ||
     text.includes("kinte hobe")
   ) {
@@ -196,23 +213,28 @@ export function matchLocalIntent(rawText: string): ChotuParsedResult | null {
     text.includes("সবচে বেশি") ||
     text.includes("top selling") ||
     text.includes("top product") ||
+    text.includes("top products") ||
+    text.includes("best selling") ||
     text.includes("beshi bikri") ||
     text.includes("জনপ্রিয় পণ্য")
   ) {
     return {
       intent: "CHECK_TOP_PRODUCTS",
       confidence: "HIGH",
-      parameters: { timeframe: text.includes("মাস") ? "month" : "week" },
+      parameters: { timeframe: text.includes("মাস") || text.includes("month") ? "month" : "week" },
     }
   }
 
-  // 5. NAVIGATION
+  // 5. NAVIGATION / OPEN PAGES
   if (
     text.includes("বিলিং") ||
     text.includes("বিল পেজ") ||
     text.includes("billing") ||
     text.includes("pos") ||
-    text.includes("বিক্রির পেজ")
+    text.includes("open billing") ||
+    text.includes("বিক্রির পেজ") ||
+    text.includes("new bill") ||
+    text.includes("নতুন বিল")
   ) {
     return {
       intent: "OPEN_PAGE",
@@ -220,25 +242,71 @@ export function matchLocalIntent(rawText: string): ChotuParsedResult | null {
       parameters: { targetPage: "billing" },
     }
   }
-  if (text.includes("ইনভেন্টরি") || text.includes("পণ্য তালিকা") || text.includes("inventory")) {
+  if (
+    text.includes("ইনভেন্টরি") ||
+    text.includes("পণ্য তালিকা") ||
+    text.includes("inventory") ||
+    text.includes("products") ||
+    text.includes("open inventory") ||
+    text.includes("open products") ||
+    text.includes("সকল পণ্য") ||
+    text.includes("সব পণ্য")
+  ) {
     return {
       intent: "OPEN_PAGE",
       confidence: "HIGH",
       parameters: { targetPage: "inventory" },
     }
   }
-  if (text.includes("কাস্টমার") || text.includes("খরিদ্দার") || text.includes("customer")) {
+  if (
+    text.includes("কাস্টমার") ||
+    text.includes("খরিদ্দার") ||
+    text.includes("customers") ||
+    text.includes("customer list") ||
+    text.includes("open customers") ||
+    text.includes("বাকি খাতা") ||
+    text.includes("ledger")
+  ) {
     return {
       intent: "OPEN_PAGE",
       confidence: "HIGH",
       parameters: { targetPage: "customers" },
     }
   }
-  if (text.includes("রিপোর্ট") || text.includes("report")) {
+  if (
+    text.includes("রিপোর্ট") ||
+    text.includes("reports") ||
+    text.includes("report") ||
+    text.includes("open reports") ||
+    text.includes("খতিয়ান")
+  ) {
     return {
       intent: "OPEN_PAGE",
       confidence: "HIGH",
       parameters: { targetPage: "reports" },
+    }
+  }
+  if (
+    text.includes("ক্যাশ বক্স পেজ") ||
+    text.includes("open cashbox") ||
+    text.includes("ক্যাশ পেজ")
+  ) {
+    return {
+      intent: "OPEN_PAGE",
+      confidence: "HIGH",
+      parameters: { targetPage: "cashbox" },
+    }
+  }
+  if (
+    text.includes("পণ্য যোগ") ||
+    text.includes("নতুন পণ্য") ||
+    text.includes("add product") ||
+    text.includes("new product")
+  ) {
+    return {
+      intent: "OPEN_PAGE",
+      confidence: "HIGH",
+      parameters: { targetPage: "inventory" },
     }
   }
 

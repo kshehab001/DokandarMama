@@ -60,12 +60,11 @@ export function ShopThemeProvider({ children }: { children: React.ReactNode }) {
   // Map server role to user role hierarchy:
   // "admin" -> "owner", "manager" -> "manager", "shopkeeper" -> "shopkeeper"
   const derivedRole: UserRole = useMemo(() => {
-    if (roleOverride) return roleOverride
     if (isSuperAdminEmail && window.location.pathname.startsWith("/admin")) return "superadmin"
     if (serverRole === "admin") return "owner"
     if (serverRole === "manager") return "manager"
     return "shopkeeper"
-  }, [roleOverride, serverRole, isSuperAdminEmail])
+  }, [serverRole, isSuperAdminEmail])
 
   // Active Category
   const activeCategoryId: ShopCategoryId = useMemo(() => {
@@ -122,8 +121,9 @@ export function ShopThemeProvider({ children }: { children: React.ReactNode }) {
 
   const switchShop = (shopId: number) => {
     localStorage.setItem("dokandar_active_shop_id", String(shopId))
-    // Trigger current shop refetch
-    queryClient.invalidateQueries({ queryKey: getGetCurrentShopQueryKey() })
+    // Clear and invalidate entire query cache so all data refreshes for the active shop
+    queryClient.clear()
+    queryClient.invalidateQueries()
   }
 
   const value = useMemo<ShopThemeContextValue>(() => {
@@ -138,7 +138,7 @@ export function ShopThemeProvider({ children }: { children: React.ReactNode }) {
       isManager: derivedRole === "manager",
       isShopkeeper: derivedRole === "shopkeeper",
       setCategoryOverride,
-      setRoleOverride,
+      setRoleOverride: () => {},
       changeShopCategory,
       switchShop,
     }

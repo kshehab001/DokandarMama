@@ -22,6 +22,7 @@ import {
   Globe,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { VoiceAssistant } from "./voice-assistant"
 import { ChouFloatingWidget } from "./chou-floating-widget"
 import { useClerk, useUser } from "@clerk/react"
 import { useShopTheme } from "@/context/shop-theme-context"
@@ -50,11 +51,11 @@ import {
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
 
-const ROLE_LABELS: Record<UserRole, { labelBn: string; icon: any; color: string }> = {
-  superadmin: { labelBn: "সুপার অ্যাডমিন", icon: ShieldAlert, color: "bg-red-500/10 text-red-600 border-red-500/20" },
-  owner: { labelBn: "মালিক (Owner)", icon: Crown, color: "bg-amber-500/10 text-amber-700 border-amber-500/20" },
-  manager: { labelBn: "ম্যানেজার", icon: Briefcase, color: "bg-blue-500/10 text-blue-700 border-blue-500/20" },
-  shopkeeper: { labelBn: "দোকানদার (POS)", icon: User, color: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" },
+const ROLE_LABELS: Record<UserRole, { labelBn: string; labelEn: string; icon: any; color: string }> = {
+  superadmin: { labelBn: "সুপার অ্যাডমিন", labelEn: "Super Admin", icon: ShieldAlert, color: "bg-red-500/10 text-red-600 border-red-500/20" },
+  owner: { labelBn: "মালিক (Owner)", labelEn: "Owner", icon: Crown, color: "bg-amber-500/10 text-amber-700 border-amber-500/20" },
+  manager: { labelBn: "ম্যানেজার", labelEn: "Manager", icon: Briefcase, color: "bg-blue-500/10 text-blue-700 border-blue-500/20" },
+  shopkeeper: { labelBn: "দোকানদার (POS)", labelEn: "Shopkeeper", icon: User, color: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" },
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -70,7 +71,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     isOwner,
     isManager,
     isShopkeeper,
-    setRoleOverride,
     changeShopCategory,
     activeShop,
     allShops,
@@ -78,7 +78,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
   } = useShopTheme()
 
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
-  const [isRoleModalOpen, setIsRoleModalOpen] = useState(false)
 
   const { language, toggleLanguage, t } = useLanguage()
   const { isOnline, isSyncing, pendingCount, runSync } = useOfflineSync()
@@ -99,8 +98,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       return [
         { href: "/app", label: t("nav.dashboard", "আজকের শিফট"), icon: Home },
         { href: "/app/billing", label: t("nav.billing", "দ্রুত বিক্রি"), icon: ShoppingCart },
-        { href: "/app/inventory", label: category.terminology.productLabel, icon: Package },
-        { href: "/app/customers", label: category.terminology.bakiLabel, icon: Users },
+        { href: "/app/inventory", label: language === "en" ? "Products" : category.terminology.productLabel, icon: Package },
+        { href: "/app/customers", label: language === "en" ? "Customers & Due" : category.terminology.bakiLabel, icon: Users },
         { href: "/app/cashbox", label: t("nav.cashbox", "ক্যাশ ড্রয়ার"), icon: Wallet },
       ]
     }
@@ -109,8 +108,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
       return [
         { href: "/app", label: t("nav.dashboard", "ড্যাশবোর্ড"), icon: Home },
         { href: "/app/billing", label: t("nav.billing", "বিলিং"), icon: ShoppingCart },
-        { href: "/app/inventory", label: category.terminology.stockLabel, icon: Package },
-        { href: "/app/customers", label: category.terminology.bakiLabel, icon: Users },
+        { href: "/app/inventory", label: language === "en" ? "Inventory" : category.terminology.stockLabel, icon: Package },
+        { href: "/app/customers", label: language === "en" ? "Customers & Due" : category.terminology.bakiLabel, icon: Users },
         { href: "/app/cashbox", label: t("nav.cashbox", "ক্যাশ বক্স"), icon: Wallet },
         { href: "/app/reports", label: t("nav.reports", "রিপোর্ট"), icon: BarChart3 },
       ]
@@ -120,16 +119,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
     return [
       { href: "/app", label: t("nav.dashboard", "বিজনেস হোম"), icon: Home },
       { href: "/app/billing", label: t("nav.billing", "বিক্রি / POS"), icon: ShoppingCart },
-      { href: "/app/inventory", label: category.terminology.stockLabel, icon: Package },
-      { href: "/app/customers", label: category.terminology.bakiLabel, icon: Users },
+      { href: "/app/inventory", label: language === "en" ? "Inventory" : category.terminology.stockLabel, icon: Package },
+      { href: "/app/customers", label: language === "en" ? "Customers & Due" : category.terminology.bakiLabel, icon: Users },
       { href: "/app/cashbox", label: t("nav.cashbox", "ক্যাশ বক্স"), icon: Wallet },
       { href: "/app/reports", label: t("nav.reports", "আর্থিক খতিয়ান"), icon: BarChart3 },
-      { href: "/app/management", label: "ম্যানেজমেন্ট", icon: Crown },
+      { href: "/app/management", label: t("nav.management", "ম্যানেজমেন্ট"), icon: Crown },
     ]
   })()
 
   const CategoryIcon = category.icon
-  const RoleInfo = ROLE_LABELS[role]
+  const RoleInfo = ROLE_LABELS[role] || ROLE_LABELS.owner
   const RoleIcon = RoleInfo.icon
 
   return (
@@ -146,22 +145,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
           {/* Official Logo — always visible */}
           <img src="/logo.png" alt="দোকানদার মামা" className="h-7 w-auto object-contain" />
 
-          <button
-            onClick={() => setIsCategoryModalOpen(true)}
-            className="flex items-center gap-1.5 p-1.5 rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold text-xs"
-            title="ক্যাটাগরি পরিবর্তন করুন"
-          >
-            <CategoryIcon className="w-4 h-4" />
-            <span>{category.displayNameBn}</span>
-          </button>
+          {isOwner && (
+            <button
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="flex items-center gap-1.5 p-1.5 rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold text-xs"
+              title="ক্যাটাগরি পরিবর্তন করুন"
+            >
+              <CategoryIcon className="w-4 h-4" />
+              <span>{language === "en" ? category.name.split("/")[0] : category.displayNameBn}</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => setIsRoleModalOpen(true)}
-            className={cn("text-[10px] font-semibold px-2 py-1 rounded-lg border", RoleInfo.color)}
-            title="রোল পরিবর্তন বা টেস্ট করুন"
+          {/* Read-Only Role Badge */}
+          <div
+            className={cn("text-[10px] font-bold px-2 py-1 rounded-lg border flex items-center gap-1", RoleInfo.color)}
           >
-            {RoleInfo.labelBn}
-          </button>
+            <RoleIcon className="w-3 h-3" />
+            <span>{language === "en" ? RoleInfo.labelEn : RoleInfo.labelBn}</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -186,7 +187,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="rounded-xl">
-                <DropdownMenuLabel className="text-xs">আপনার শাখাসমূহ</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-xs">{language === "en" ? "Your Branches" : "আপনার শাখাসমূহ"}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {allShops.map((s) => (
                   <DropdownMenuItem
@@ -219,8 +220,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {!isOnline ? <WifiOff className="w-4 h-4 shrink-0" /> : <RefreshCw className={cn("w-4 h-4 shrink-0", isSyncing && "animate-spin")} />}
             <span>
               {!isOnline
-                ? `অফলাইন মোড — নেট নেই। বিক্রয় ও হিসাব ফোনে সেভ হচ্ছে (${pendingCount} টি অপেক্ষমাণ)`
-                : `${pendingCount} টি অফলাইন ডাটা সার্ভারে সিঙ্ক হচ্ছে...`}
+                ? language === "en"
+                  ? `Offline Mode — No internet. Sales saved locally (${pendingCount} pending)`
+                  : `অফলাইন মোড — নেট নেই। বিক্রয় ও হিসাব ফোনে সেভ হচ্ছে (${pendingCount} টি অপেক্ষমাণ)`
+                : language === "en"
+                  ? `${pendingCount} offline records syncing to server...`
+                  : `${pendingCount} টি অফলাইন ডাটা সার্ভারে সিঙ্ক হচ্ছে...`}
             </span>
           </div>
           {isOnline && pendingCount > 0 && (
@@ -229,7 +234,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               disabled={isSyncing}
               className="bg-zinc-950 text-white px-2.5 py-0.5 rounded-lg text-[11px] font-bold"
             >
-              {isSyncing ? "সিঙ্ক হচ্ছে..." : "এখনই সিঙ্ক করুন"}
+              {isSyncing ? (language === "en" ? "Syncing..." : "সিঙ্ক হচ্ছে...") : (language === "en" ? "Sync Now" : "এখনই সিঙ্ক করুন")}
             </button>
           )}
         </div>
@@ -255,40 +260,54 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
           {/* Shop Switcher & Category Badge */}
           <div className="space-y-2">
-            <button
-              onClick={() => setIsCategoryModalOpen(true)}
-              className="w-full flex items-center justify-between p-2.5 rounded-xl border bg-muted/30 hover:bg-muted/60 transition-colors text-left group"
-            >
-              <div className="flex items-center gap-2">
+            {isOwner ? (
+              <button
+                onClick={() => setIsCategoryModalOpen(true)}
+                className="w-full flex items-center justify-between p-2.5 rounded-xl border bg-muted/30 hover:bg-muted/60 transition-colors text-left group"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                    <CategoryIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-foreground group-hover:text-primary transition-colors">
+                      {language === "en" ? category.name.split("/")[0] : category.displayNameBn}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground truncate max-w-[130px]">
+                      {activeShop?.name || (user?.unsafeMetadata as any)?.shopName || "আপনার দোকান"}
+                    </div>
+                  </div>
+                </div>
+                <Sparkles className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary" />
+              </button>
+            ) : (
+              <div className="w-full flex items-center gap-2 p-2.5 rounded-xl border bg-muted/30 text-left">
                 <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
                   <CategoryIcon className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-foreground group-hover:text-primary transition-colors">
-                    {category.displayNameBn}
+                  <div className="text-xs font-bold text-foreground">
+                    {language === "en" ? category.name.split("/")[0] : category.displayNameBn}
                   </div>
                   <div className="text-[10px] text-muted-foreground truncate max-w-[130px]">
-                    {activeShop?.name || (user?.unsafeMetadata as any)?.shopName || "আপনার দোকান"}
+                    {activeShop?.name || "আপনার দোকান"}
                   </div>
                 </div>
               </div>
-              <Sparkles className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary" />
-            </button>
+            )}
 
-            {/* Role Badge with Switcher for Pair Programming & Testing */}
-            <button
-              onClick={() => setIsRoleModalOpen(true)}
+            {/* Read-Only Role Badge */}
+            <div
               className={cn(
-                "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition-colors",
+                "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs font-semibold",
                 RoleInfo.color,
               )}
             >
               <div className="flex items-center gap-1.5">
                 <RoleIcon className="w-3.5 h-3.5" />
-                <span>{RoleInfo.labelBn}</span>
+                <span>{language === "en" ? RoleInfo.labelEn : RoleInfo.labelBn}</span>
               </div>
-              <span className="text-[10px] opacity-75">রোল পরিবর্তন ▾</span>
-            </button>
+            </div>
           </div>
         </div>
 
@@ -320,7 +339,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="p-3 border-t space-y-2">
           {allShops.length > 1 && isOwner && (
             <div className="px-1 text-[11px] text-muted-foreground flex justify-between items-center">
-              <span>মোট শাখা: {allShops.length} টি</span>
+              <span>{language === "en" ? `Branches: ${allShops.length}` : `মোট শাখা: ${allShops.length} টি`}</span>
             </div>
           )}
           <button
@@ -328,7 +347,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive w-full transition-colors"
           >
             <LogOut className="w-4 h-4" />
-            লগ আউট
+            {language === "en" ? "Log Out" : "লগ আউট"}
           </button>
         </div>
       </aside>
@@ -360,16 +379,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
       {/* Single Persistent Chotu Genie Assistant mounted ONCE at app root */}
       <ChouFloatingWidget language={language} />
+      <VoiceAssistant />
 
-      {/* 1. Category Switcher Modal */}
+      {/* Category Switcher Modal (Owner Only) */}
       <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
         <DialogContent className="sm:max-w-lg rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" /> দোকানের ধরন ও থিম পরিবর্তন করুন
+              <Sparkles className="h-5 w-5 text-primary" /> {language === "en" ? "Change Shop Type & Theme" : "দোকানের ধরন ও থিম পরিবর্তন করুন"}
             </DialogTitle>
             <DialogDescription>
-              ক্যাটাগরি পরিবর্তন করলে থিম কালার, ড্যাশবোর্ড উইজেট ও টার্মিনোলজি সাথে সাথে পরিবর্তিত হবে। আপনার পণ্য বা বিক্রির কোনো তথ্য ডিলিট হবে না।
+              {language === "en"
+                ? "Switching category adapts the theme color, terminology, and widgets without affecting your existing sales or inventory data."
+                : "ক্যাটাগরি পরিবর্তন করলে থিম কালার, ড্যাশবোর্ড উইজেট ও টার্মিনোলজি সাথে সাথে পরিবর্তিত হবে। আপনার পণ্য বা বিক্রির কোনো তথ্য ডিলিট হবে না।"}
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 py-3 max-h-80 overflow-y-auto p-1">
@@ -392,60 +414,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 >
                   {isSelected && <Check className="h-4 w-4 text-primary absolute top-2 right-2" />}
                   <Icon className={cn("h-5 w-5 mb-1.5", isSelected ? "text-primary" : "text-muted-foreground")} />
-                  <span className="text-xs font-bold leading-tight">{cat.displayNameBn}</span>
+                  <span className="text-xs font-bold leading-tight">{language === "en" ? cat.name.split("/")[0] : cat.displayNameBn}</span>
                   <span className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{cat.name.split("/")[0]}</span>
-                </button>
-              )
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* 2. Role Switcher Modal */}
-      <Dialog open={isRoleModalOpen} onOpenChange={setIsRoleModalOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <Crown className="h-5 w-5 text-amber-500" /> ইউজার রোল নির্বাচন / টেস্ট করুন
-            </DialogTitle>
-            <DialogDescription>
-              বিভিন্ন রোলের জন্য ইন্টারফেস কেমন দেখায় তা পরীক্ষা করুন।
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            {(["owner", "manager", "shopkeeper", "superadmin"] as UserRole[]).map((r) => {
-              const info = ROLE_LABELS[r]
-              const Icon = info.icon
-              const isSelected = role === r
-              return (
-                <button
-                  key={r}
-                  onClick={() => {
-                    setRoleOverride(r)
-                    setIsRoleModalOpen(false)
-                  }}
-                  className={cn(
-                    "w-full flex items-center justify-between p-3 rounded-2xl border transition-all text-left",
-                    isSelected
-                      ? "border-primary bg-primary/10 text-primary font-bold shadow-sm"
-                      : "border-border hover:bg-muted text-foreground",
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={cn("p-2 rounded-xl border", info.color)}>
-                      <Icon className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="font-bold text-sm">{info.labelBn}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {r === "superadmin" && "প্ল্যাটফর্ম ব্যবস্থাপনা ও সকল ব্যবসা"}
-                        {r === "owner" && "সম্পূর্ণ বিজনেস, মাল্টি-শপ ও আর্থিক খতিয়ান"}
-                        {r === "manager" && "দৈনিক পরিচালনা, ইনভেন্টরি ও ক্যাশ বক্স"}
-                        {r === "shopkeeper" && "মোবাইল-ফার্স্ট দ্রুত বিলিং ও বারকোড"}
-                      </div>
-                    </div>
-                  </div>
-                  {isSelected && <Check className="w-5 h-5 text-primary shrink-0" />}
                 </button>
               )
             })}
