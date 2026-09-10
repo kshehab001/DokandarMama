@@ -31,6 +31,7 @@ import { useLocation } from "wouter"
 
 export type ChouPose =
   | "idle"
+  | "listening"
   | "billing"
   | "sale_done"
   | "inventory"
@@ -42,7 +43,7 @@ export type ChouPose =
   | "open"
   | "close"
 
-export type ChouMood = "happy" | "excited" | "concerned" | "thinking" | "waiting" | "proud" | "neutral"
+export type ChouMood = "happy" | "excited" | "concerned" | "thinking" | "waiting" | "proud" | "neutral" | "curious"
 
 export interface ChouPresence {
   pose: ChouPose

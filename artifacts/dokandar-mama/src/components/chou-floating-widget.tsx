@@ -120,6 +120,7 @@ function contextBubble(pose: ChouPose, mood: ChouMood, name: string): string | n
 function poseToAvatarState(pose: ChouPose, mood: ChouMood): ChotuState {
   if (mood === "excited" || pose === "sale_done") return "success"
   if (mood === "concerned" || pose === "low_stock" || pose === "offline") return "thinking"
+  if (pose === "listening") return "listening"
   return "idle"
 }
 
@@ -128,6 +129,7 @@ function poseToAvatarState(pose: ChouPose, mood: ChouMood): ChotuState {
 // ---------------------------------------------------------------------------
 const POSE_PROPS: Record<ChouPose, { emoji: string; label: string }> = {
   idle: { emoji: "✨", label: "" },
+  listening: { emoji: "🎙️", label: "শুনছি" },
   billing: { emoji: "🧾", label: "বিল" },
   sale_done: { emoji: "🎉", label: "বিক্রি!" },
   inventory: { emoji: "🧹", label: "স্টক" },
