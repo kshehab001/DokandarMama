@@ -38,6 +38,7 @@ import {
   getGetRestockSuggestionsQueryKey,
   getGetCashboxStateQueryKey,
   getProductByBarcode,
+  customFetch,
 } from "@workspace/api-client-react"
 import {
   type ChotuConfig,
@@ -459,6 +460,17 @@ export function VoiceAssistant() {
     }
   }
 
+  // General AI chat is deliberately server-side: it gets a fresh database
+  // snapshot and can use web search without exposing an API key in the app.
+  const askChotuAI = async (message: string): Promise<string> => {
+    const result = await customFetch<{ reply: string }>("/api/chotu/chat", {
+      method: "POST",
+      responseType: "json",
+      body: JSON.stringify({ message, language }),
+    })
+    return result.reply
+  }
+
   // Command Processing Logic via Modular AI Interpretation Layer
   const processCommand = async (rawText: string) => {
     setIsActing(true)
@@ -475,13 +487,15 @@ export function VoiceAssistant() {
           availableProducts: products?.map((p: any) => p.name) || [],
           availableCustomers: customers?.map((c: any) => c.name) || [],
         },
-        import.meta.env.VITE_GEMINI_API_KEY
+        undefined
       )
 
-      // 2. Handle Low Confidence (Politely ask user to rephrase)
+      // 2. For anything outside a safe shop command, use the full AI assistant.
+      // The server reads current shop data itself, so this is never a stale
+      // browser snapshot and no model key is exposed to the client.
       if (parsed.confidence === "LOW") {
-        reply = parsed.clarificationQuestion || (language === "en" ? "Sorry, I couldn't understand that. Please say it clearly." : "মামা, কথাটা বুঝতে পারিনি। অনুগ্রহ করে আরেকটু স্পষ্ট করে বলুন।")
-        triggerErrorState()
+        reply = await askChotuAI(rawText)
+        success = true
       }
       // 3. Handle Medium Confidence (Ask specific clarification question)
       else if (parsed.confidence === "MEDIUM") {

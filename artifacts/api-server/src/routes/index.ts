@@ -11,6 +11,7 @@ import cashboxRouter from "./cashbox";
 import purchasesRouter from "./purchases";
 import subscriptionsRouter from "./subscriptions";
 import adminRouter from "./admin";
+import chotuRouter from "./chotu";
 import { requireAuth } from "../lib/auth";
 import { withShopContext } from "../lib/tenant";
 
@@ -35,5 +36,6 @@ router.use(cashboxRouter);
 router.use(purchasesRouter);
 router.use(subscriptionsRouter);
 router.use(adminRouter);
+router.use(chotuRouter);
 
 export default router;
