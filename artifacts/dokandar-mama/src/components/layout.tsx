@@ -1,4 +1,3 @@
-import { useState } from "react"
 import { Link, useLocation } from "wouter"
 import {
   Home,
@@ -9,14 +8,11 @@ import {
   Wallet,
   LogOut,
   Building2,
-  ChevronDown,
   Layers,
   Crown,
   Briefcase,
   User,
   ShieldAlert,
-  Sparkles,
-  Check,
   WifiOff,
   RefreshCw,
   Globe,
@@ -30,24 +26,7 @@ import { useLanguage } from "@/context/language-context"
 import { useOfflineSync } from "@/lib/offline-sync"
 import { ShopShutter } from "./shop-shutter"
 import { ShopkeeperOnboardingModal } from "./shopkeeper-onboarding-modal"
-import { CATEGORY_LIST, type ShopCategoryId, type UserRole } from "@/lib/theme-config"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { type UserRole } from "@/lib/theme-config"
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "")
 
@@ -65,19 +44,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const {
     category,
-    categoryId,
     role,
     isSuperAdmin,
     isOwner,
     isManager,
     isShopkeeper,
-    changeShopCategory,
     activeShop,
-    allShops,
-    switchShop,
   } = useShopTheme()
-
-  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
 
   const { language, toggleLanguage, t } = useLanguage()
   const { isOnline, isSyncing, pendingCount, runSync } = useOfflineSync()
@@ -87,7 +60,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     if (isSuperAdmin) {
       return [
         { href: "/admin", label: t("nav.dashboard", "প্ল্যাটফর্ম হোম"), icon: ShieldAlert },
-        { href: "/app", label: t("nav.dashboard", "শপ ড্যাশবোর্ড"), icon: Home },
+        { href: "/app", label: t("nav.dashboard", "শপ হোম"), icon: Home },
         { href: "/app/reports", label: t("nav.reports", "অ্যানালিটিক্স"), icon: BarChart3 },
         { href: "/app/customers", label: t("nav.customers", "ব্যবহারকারী"), icon: Users },
         { href: "/app/inventory", label: t("nav.inventory", "ক্যাটাগরি"), icon: Layers },
@@ -106,7 +79,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
     if (isManager) {
       return [
-        { href: "/app", label: t("nav.dashboard", "ড্যাশবোর্ড"), icon: Home },
+        { href: "/app", label: t("nav.dashboard", "হোম"), icon: Home },
         { href: "/app/billing", label: t("nav.billing", "বিলিং"), icon: ShoppingCart },
         { href: "/app/inventory", label: language === "en" ? "Inventory" : category.terminology.stockLabel, icon: Package },
         { href: "/app/customers", label: language === "en" ? "Customers & Due" : category.terminology.bakiLabel, icon: Users },
@@ -127,7 +100,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
     ]
   })()
 
-  const CategoryIcon = category.icon
   const RoleInfo = ROLE_LABELS[role] || ROLE_LABELS.owner
   const RoleIcon = RoleInfo.icon
 
@@ -144,17 +116,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-2">
           {/* Official Logo — always visible */}
           <img src="/logo.png" alt="দোকানদার মামা" className="h-7 w-auto object-contain" />
-
-          {isOwner && (
-            <button
-              onClick={() => setIsCategoryModalOpen(true)}
-              className="flex items-center gap-1.5 p-1.5 rounded-xl bg-primary/10 border border-primary/20 text-primary font-bold text-xs"
-              title="ক্যাটাগরি পরিবর্তন করুন"
-            >
-              <CategoryIcon className="w-4 h-4" />
-              <span>{language === "en" ? category.name.split("/")[0] : category.displayNameBn}</span>
-            </button>
-          )}
 
           {/* Read-Only Role Badge */}
           <div
@@ -175,33 +136,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Globe className="w-3.5 h-3.5 text-primary" />
             <span>{language === "bn" ? "বাং" : "EN"}</span>
           </button>
-
-          {/* Multi-Shop Branch Switcher for Owner */}
-          {allShops.length > 1 && isOwner && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8 px-2 text-xs gap-1 rounded-xl">
-                  <Building2 className="w-3.5 h-3.5" />
-                  <span className="max-w-[70px] truncate">{activeShop?.name || "দোকান"}</span>
-                  <ChevronDown className="w-3 h-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="rounded-xl">
-                <DropdownMenuLabel className="text-xs">{language === "en" ? "Your Branches" : "আপনার শাখাসমূহ"}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {allShops.map((s) => (
-                  <DropdownMenuItem
-                    key={s.id}
-                    onClick={() => switchShop(s.id)}
-                    className="text-xs flex items-center justify-between"
-                  >
-                    <span>{s.name}</span>
-                    {s.id === activeShop?.id && <Check className="w-3.5 h-3.5 text-primary" />}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
 
           <button
             onClick={() => signOut({ redirectUrl: basePath || "/" })}
@@ -258,43 +192,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          {/* Shop Switcher & Category Badge */}
+          {/* Active shop and role */}
           <div className="space-y-2">
-            {isOwner ? (
-              <button
-                onClick={() => setIsCategoryModalOpen(true)}
-                className="w-full flex items-center justify-between p-2.5 rounded-xl border bg-muted/30 hover:bg-muted/60 transition-colors text-left group"
-              >
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
-                    <CategoryIcon className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-foreground group-hover:text-primary transition-colors">
-                      {language === "en" ? category.name.split("/")[0] : category.displayNameBn}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground truncate max-w-[130px]">
-                      {activeShop?.name || (user?.unsafeMetadata as any)?.shopName || "আপনার দোকান"}
-                    </div>
-                  </div>
-                </div>
-                <Sparkles className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary" />
-              </button>
-            ) : (
-              <div className="w-full flex items-center gap-2 p-2.5 rounded-xl border bg-muted/30 text-left">
-                <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
-                  <CategoryIcon className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-foreground">
-                    {language === "en" ? category.name.split("/")[0] : category.displayNameBn}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground truncate max-w-[130px]">
-                    {activeShop?.name || "আপনার দোকান"}
-                  </div>
-                </div>
+            <div className="w-full flex items-center gap-2 p-2.5 rounded-xl border bg-muted/30 text-left">
+              <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
+                <Building2 className="w-4 h-4" />
               </div>
-            )}
+              <div className="text-xs font-bold text-foreground truncate">
+                {activeShop?.name || (user?.unsafeMetadata as any)?.shopName || "আপনার দোকান"}
+              </div>
+            </div>
 
             {/* Read-Only Role Badge */}
             <div
@@ -337,11 +244,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         {/* Bottom Profile / Signout */}
         <div className="p-3 border-t space-y-2">
-          {allShops.length > 1 && isOwner && (
-            <div className="px-1 text-[11px] text-muted-foreground flex justify-between items-center">
-              <span>{language === "en" ? `Branches: ${allShops.length}` : `মোট শাখা: ${allShops.length} টি`}</span>
-            </div>
-          )}
           <button
             onClick={() => signOut({ redirectUrl: basePath || "/" })}
             className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive w-full transition-colors"
@@ -381,47 +283,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <ChouFloatingWidget language={language} />
       <VoiceAssistant />
 
-      {/* Category Switcher Modal (Owner Only) */}
-      <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
-        <DialogContent className="sm:max-w-lg rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" /> {language === "en" ? "Change Shop Type & Theme" : "দোকানের ধরন ও থিম পরিবর্তন করুন"}
-            </DialogTitle>
-            <DialogDescription>
-              {language === "en"
-                ? "Switching category adapts the theme color, terminology, and widgets without affecting your existing sales or inventory data."
-                : "ক্যাটাগরি পরিবর্তন করলে থিম কালার, ড্যাশবোর্ড উইজেট ও টার্মিনোলজি সাথে সাথে পরিবর্তিত হবে। আপনার পণ্য বা বিক্রির কোনো তথ্য ডিলিট হবে না।"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 py-3 max-h-80 overflow-y-auto p-1">
-            {CATEGORY_LIST.map((cat) => {
-              const Icon = cat.icon
-              const isSelected = categoryId === cat.id
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    changeShopCategory(cat.id)
-                    setIsCategoryModalOpen(false)
-                  }}
-                  className={cn(
-                    "flex flex-col items-start p-3 rounded-2xl border text-left transition-all relative hover:scale-[1.02]",
-                    isSelected
-                      ? "border-primary bg-primary/10 text-primary shadow-sm font-bold ring-2 ring-primary/30"
-                      : "border-border/70 hover:bg-muted/80 bg-card text-foreground",
-                  )}
-                >
-                  {isSelected && <Check className="h-4 w-4 text-primary absolute top-2 right-2" />}
-                  <Icon className={cn("h-5 w-5 mb-1.5", isSelected ? "text-primary" : "text-muted-foreground")} />
-                  <span className="text-xs font-bold leading-tight">{language === "en" ? cat.name.split("/")[0] : cat.displayNameBn}</span>
-                  <span className="text-[10px] text-muted-foreground line-clamp-1 mt-0.5">{cat.name.split("/")[0]}</span>
-                </button>
-              )
-            })}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

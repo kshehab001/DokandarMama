@@ -12,7 +12,7 @@ interface LanguageContextType {
 const DICTIONARY: Record<Language, Record<string, string>> = {
   bn: {
     // Navigation
-    "nav.dashboard": "ড্যাশবোর্ড",
+    "nav.dashboard": "হোম",
     "nav.billing": "বিলিং",
     "nav.inventory": "ইনভেন্টরি",
     "nav.customers": "কাস্টমার ও বাকি",
@@ -61,7 +61,7 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
   },
   en: {
     // Navigation
-    "nav.dashboard": "Dashboard",
+    "nav.dashboard": "Home",
     "nav.billing": "Billing",
     "nav.inventory": "Inventory",
     "nav.customers": "Customers & Due",

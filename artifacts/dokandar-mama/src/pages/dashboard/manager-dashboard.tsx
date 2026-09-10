@@ -159,7 +159,7 @@ export function ManagerDashboard() {
       <div>
         <h2 className="text-2xl font-bold text-foreground">{greeting(displayName)}</h2>
         <p className="text-muted-foreground text-sm mt-0.5">
-          {activeShop?.name} — আজকের পরিচালনা ড্যাশবোর্ড
+          {activeShop?.name} — আজকের পরিচালনা হোম
         </p>
       </div>
 

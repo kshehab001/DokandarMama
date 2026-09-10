@@ -45,14 +45,11 @@ import {
   Zap,
   HeartHandshake,
   UserCheck,
-  Building2,
   Crown,
   ChevronRight,
   Activity,
-  Download,
   CreditCard,
   Coins,
-  FileSpreadsheet,
 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
@@ -76,7 +73,7 @@ function greeting(name: string): string {
 
 export function OwnerDashboard() {
   const { user } = useUser()
-  const { category, categoryId, activeShop, allShops, switchShop, isOwner } = useShopTheme()
+  const { category, categoryId, activeShop } = useShopTheme()
   const queryClient = useQueryClient()
   const { toast } = useToast()
 
@@ -92,69 +89,6 @@ export function OwnerDashboard() {
   const [isOpenCashboxModal, setIsOpenCashboxModal] = useState(false)
   const [openingBalance, setOpeningBalance] = useState("")
   const [openingNote, setOpeningNote] = useState("")
-  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
-  const [exportRange, setExportRange] = useState<"today" | "week" | "month" | "all">("month")
-  const [exportType, setExportType] = useState<"sales" | "inventory" | "customers" | "all">("all")
-  const [isExporting, setIsExporting] = useState(false)
-
-  const handleDownloadReport = async () => {
-    setIsExporting(true)
-    try {
-      const token = localStorage.getItem("clerk-db-jwt") || ""
-      const shopId = activeShop?.id
-      const res = await fetch(`/api/reports/export?range=${exportRange}&type=${exportType}`, {
-        headers: {
-          ...(shopId ? { "x-shop-id": String(shopId) } : {}),
-        },
-      })
-      if (!res.ok) throw new Error("Export failed")
-      const data = await res.json()
-
-      // Format CSV based on exportType
-      let csvContent = ""
-      if (exportType === "sales" || exportType === "all") {
-        csvContent += "=== SALES REPORT ===\nDate,Bill ID,Customer,Payment Method,Provider,Trx ID,Total,Paid,Due\n"
-        data.sales?.forEach((s: any) => {
-          csvContent += `"${new Date(s.date).toLocaleDateString("bn-BD")}","#${s.id}","${s.customerName || "General"}","${s.paymentMethod}","${s.digitalProvider || ""}","${s.digitalTrxId || ""}",${s.total},${s.paidAmount},${s.dueAmount}\n`
-        })
-        csvContent += "\n"
-      }
-
-      if (exportType === "inventory" || exportType === "all") {
-        csvContent += "=== INVENTORY REPORT ===\nProduct ID,Product Name,Barcode,Category,Price,Cost Price,Stock,Unit,EXP Date\n"
-        data.products?.forEach((p: any) => {
-          csvContent += `#${p.id},"${p.name}","${p.barcode || ""}","${p.category}",${p.price},${p.costPrice || 0},${p.stock},"${p.unit}","${p.expiryDate ? p.expiryDate.split("T")[0] : ""}"\n`
-        })
-        csvContent += "\n"
-      }
-
-      if (exportType === "customers" || exportType === "all") {
-        csvContent += "=== CUSTOMERS & BAKI REPORT ===\nCustomer ID,Name,Phone,Baki Balance\n"
-        data.customers?.forEach((c: any) => {
-          csvContent += `#${c.id},"${c.name}","${c.phone || ""}",${c.bakiBalance}\n`
-        })
-      }
-
-      // Trigger download
-      const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `dokandar_mama_report_${exportRange}_${new Date().toISOString().split("T")[0]}.csv`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-
-      setIsExportModalOpen(false)
-      toast({ title: "✓ রিপোর্ট সফলভাবে ডাউনলোড হয়েছে!" })
-    } catch (err) {
-      toast({ title: "রিপোর্ট তৈরি করতে সমস্যা হয়েছে", variant: "destructive" })
-    } finally {
-      setIsExporting(false)
-    }
-  }
-
   const [isExpenseModal, setIsExpenseModal] = useState(false)
   const [expenseCategoryIdx, setExpenseCategoryIdx] = useState(0)
   const [expenseAmount, setExpenseAmount] = useState("")
@@ -257,7 +191,7 @@ export function OwnerDashboard() {
           <div>
             <div className="flex items-center gap-2 mb-0.5">
               <Crown className="h-5 w-5 text-amber-500" />
-              <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">মালিক ড্যাশবোর্ড</span>
+              <span className="text-xs font-bold text-amber-600 uppercase tracking-wider">মালিক হোম</span>
             </div>
             <h2 className="text-3xl font-bold text-foreground">{greeting(displayName)}</h2>
             <p className="text-muted-foreground mt-0.5 flex items-center gap-1.5">
@@ -265,47 +199,7 @@ export function OwnerDashboard() {
               {activeShop?.name || metadata?.shopName || "আপনার দোকান"} — সম্পূর্ণ ব্যবসার খতিয়ান
             </p>
           </div>
-          
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl font-bold gap-2 h-9 border-border bg-card shadow-sm hover:bg-muted"
-              onClick={() => setIsExportModalOpen(true)}
-            >
-              <Download className="h-4 w-4 text-primary" />
-              <span>রিপোর্ট ডাউনলোড / এক্সপোর্ট</span>
-            </Button>
-
-            {/* Multi-shop summary badge */}
-            {allShops.length > 1 && (
-              <Badge className="bg-primary/10 text-primary border-primary/30 text-xs px-3 py-1.5 gap-1.5">
-                <Building2 className="h-3.5 w-3.5" />
-                {allShops.length} টি শাখা
-              </Badge>
-            )}
-          </div>
         </div>
-
-        {/* Multi-shop selector for owner */}
-        {allShops.length > 1 && (
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-            {allShops.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => switchShop(s.id)}
-                className={cn(
-                  "shrink-0 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all",
-                  s.id === activeShop?.id
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-card border-border text-muted-foreground hover:bg-muted"
-                )}
-              >
-                {s.name}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Real-time Current Balances Position Banner (Cash, Digital & Total) */}
@@ -737,98 +631,6 @@ export function OwnerDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Export / Download Data Dialog */}
-      <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <FileSpreadsheet className="h-5 w-5 text-primary" />
-              দোকানের ডাটা ও রিপোর্ট ডাউনলোড
-            </DialogTitle>
-            <DialogDescription>
-              বিক্রি, পণ্য তালিকা বা কাস্টমার বাকির সম্পূর্ণ হিসাব এক্সেল / CSV ফরম্যাটে সেভ করুন।
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-3">
-            <div>
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">
-                রিপোর্টের ধরন বেছে নিন
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: "all", label: "সম্পূর্ণ ব্যবসা (সব ডাটা)" },
-                  { id: "sales", label: "বিক্রি ও ক্যাশমেমো" },
-                  { id: "inventory", label: "ইনভেন্টরি ও পণ্য" },
-                  { id: "customers", label: "কাস্টমার ও বাকি" },
-                ].map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setExportType(t.id as any)}
-                    className={cn(
-                      "p-3 rounded-2xl border text-xs font-bold text-left transition-all",
-                      exportType === t.id
-                        ? "border-primary bg-primary/10 text-primary shadow-sm"
-                        : "border-border text-muted-foreground hover:bg-muted"
-                    )}
-                  >
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block mb-1.5">
-                সময়সীমা (Time Range)
-              </label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {[
-                  { id: "today", label: "আজকে" },
-                  { id: "week", label: "৭ দিন" },
-                  { id: "month", label: "৩০ দিন" },
-                  { id: "all", label: "সব" },
-                ].map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => setExportRange(r.id as any)}
-                    className={cn(
-                      "py-2 rounded-xl border text-xs font-bold transition-all text-center",
-                      exportRange === r.id
-                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                        : "border-border text-muted-foreground hover:bg-muted"
-                    )}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setIsExportModalOpen(false)}
-              className="rounded-xl"
-            >
-              বাতিল
-            </Button>
-            <Button
-              type="button"
-              onClick={handleDownloadReport}
-              disabled={isExporting}
-              className="rounded-xl font-bold gap-2"
-            >
-              <Download className="h-4 w-4" />
-              {isExporting ? "তৈরি হচ্ছে..." : "CSV ডাউনলোড করুন"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

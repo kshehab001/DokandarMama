@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useUser } from "@clerk/react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
@@ -31,7 +31,6 @@ import {
   QrCode,
   SlidersHorizontal,
 } from "lucide-react"
-import { CATEGORY_LIST } from "@/lib/theme-config"
 
 const ALL_PAYMENT_METHODS = [
   { id: "bkash", name: "bKash / বিকাশ", color: "#d12053", desc: "বিকাশ মার্চেন্ট বা পার্সোনাল নম্বর" },
@@ -46,7 +45,7 @@ export function ManagementPage() {
   const { user } = useUser()
   const { toast } = useToast()
   const queryClient = useQueryClient()
-  const { category: currentCategory, changeShopCategory } = useShopTheme()
+  const { activeShop: selectedShop, allShops, switchShop } = useShopTheme()
 
   const { data: activeShop } = useGetCurrentShop()
   const updateShopMutation = useUpdateCurrentShop()
@@ -55,12 +54,21 @@ export function ManagementPage() {
   const [shopName, setShopName] = useState(activeShop?.name || "")
   const [ownerName, setOwnerName] = useState(activeShop?.ownerName || "")
   const [area, setArea] = useState(activeShop?.area || "")
-  const [category, setCategory] = useState(activeShop?.category || "mudi")
 
   // Enabled Payment Methods State
   const [enabledMethods, setEnabledMethods] = useState<string[]>(() => {
     return (activeShop as any)?.enabledPaymentMethods || ["bkash", "nagad"]
   })
+
+  // A shop switch updates the API data; keep the profile form in sync with
+  // that newly selected shop rather than showing the previous branch's data.
+  useEffect(() => {
+    if (!activeShop) return
+    setShopName(activeShop.name || "")
+    setOwnerName(activeShop.ownerName || "")
+    setArea(activeShop.area || "")
+    setEnabledMethods((activeShop as any).enabledPaymentMethods || ["bkash", "nagad"])
+  }, [activeShop?.id])
 
   // Team Members Real API
   const { data: membersData = [], isLoading: isMembersLoading } = useQuery<
@@ -124,12 +132,10 @@ export function ManagementPage() {
           name: shopName.trim(),
           ownerName: ownerName.trim() || undefined,
           area: area.trim() || undefined,
-          category: category as any,
         } as any,
       },
       {
         onSuccess: () => {
-          changeShopCategory(category as any)
           queryClient.invalidateQueries({ queryKey: getGetCurrentShopQueryKey() })
           queryClient.invalidateQueries({ queryKey: getListShopsQueryKey() })
           toast({ title: "✓ দোকানের তথ্য সফলভাবে আপডেট হয়েছে" })
@@ -405,7 +411,41 @@ export function ManagementPage() {
         </CardContent>
       </Card>
 
-      {/* 3. Shop Profile & Category Settings */}
+      {/* 3. Shop Switcher */}
+      {allShops.length > 1 && (
+        <Card className="rounded-3xl border-border shadow-sm overflow-hidden">
+          <CardHeader className="bg-muted/30 pb-4 border-b">
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-xl bg-primary/10 text-primary"><Building2 className="h-5 w-5" /></div>
+              <div>
+                <CardTitle className="text-lg">দোকান / শাখা পরিবর্তন</CardTitle>
+                <CardDescription>যে দোকানের তথ্য দেখতে বা পরিচালনা করতে চান সেটি বেছে নিন</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-5 grid gap-2 sm:grid-cols-2">
+            {allShops.map((shop) => {
+              const isSelected = shop.id === selectedShop?.id
+              return (
+                <button
+                  key={shop.id}
+                  type="button"
+                  onClick={() => switchShop(shop.id)}
+                  className={`flex items-center justify-between rounded-2xl border p-4 text-left transition-colors ${isSelected ? "border-primary bg-primary/10" : "border-border hover:bg-muted/60"}`}
+                >
+                  <div>
+                    <p className="font-bold text-sm">{shop.name}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{shop.area || "এলাকা দেওয়া হয়নি"}</p>
+                  </div>
+                  {isSelected && <CheckCircle2 className="h-5 w-5 text-primary" />}
+                </button>
+              )
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 4. Shop Profile Settings */}
       <Card className="rounded-3xl border-border shadow-sm overflow-hidden">
         <CardHeader className="bg-muted/30 pb-4 border-b">
           <div className="flex items-center gap-2">
@@ -413,8 +453,8 @@ export function ManagementPage() {
               <Store className="h-5 w-5" />
             </div>
             <div>
-              <CardTitle className="text-lg">দোকানের প্রোফাইল ও ক্যাটাগরি</CardTitle>
-              <CardDescription>নাম, এলাকা এবং ব্যবসার ধরন পরিবর্তন করুন</CardDescription>
+              <CardTitle className="text-lg">দোকানের প্রোফাইল</CardTitle>
+              <CardDescription>দোকানের নাম ও এলাকা পরিবর্তন করুন</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -446,20 +486,6 @@ export function ManagementPage() {
                   placeholder="যেমন: মিরপুর ১০, ঢাকা"
                   className="h-11 rounded-xl mt-1"
                 />
-              </div>
-              <div>
-                <Label className="text-xs font-semibold">ব্যবসার ক্যাটাগরি</Label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="w-full h-11 px-3 mt-1 rounded-xl border border-input bg-background text-sm font-medium outline-none"
-                >
-                  {CATEGORY_LIST.map((c: any) => (
-                    <option key={c.id} value={c.id}>
-                      {c.displayNameBn} ({c.name})
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
 
