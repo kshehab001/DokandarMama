@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { Component, useEffect, useRef, type ErrorInfo, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -29,6 +29,46 @@ import { SignUpPage } from '@/pages/sign-up';
 import { ManagementPage } from '@/pages/management';
 
 const queryClient = new QueryClient();
+
+// A voice command can navigate to any authenticated screen.  Do not let an
+// unexpected render failure on one of those screens leave the user staring at
+// an empty browser tab; show a recoverable, human-readable screen instead.
+class AppErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('Dokandar Mama render error:', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-6 text-center">
+          <div className="max-w-md w-full bg-card border border-card-border rounded-2xl p-6 shadow-sm">
+            <div className="text-4xl mb-3" aria-hidden="true">⚠️</div>
+            <h1 className="text-lg font-bold text-foreground mb-2">পেজটি খুলতে সমস্যা হয়েছে</h1>
+            <p className="text-sm text-muted-foreground mb-5">
+              আপনার কোনো হিসাব বা তথ্য হারায়নি। আবার চেষ্টা করতে নিচের বাটনে চাপ দিন।
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            >
+              আবার চেষ্টা করুন
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 // Resolves key from build-time Vite env OR runtime window injection OR hostname
 const rawClerkKey =
@@ -322,14 +362,16 @@ function App() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WouterRouter base={basePath}>
-          <ClerkProviderWithRoutes />
-        </WouterRouter>
-        <Toaster />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WouterRouter base={basePath}>
+            <ClerkProviderWithRoutes />
+          </WouterRouter>
+          <Toaster />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </AppErrorBoundary>
   );
 }
 
