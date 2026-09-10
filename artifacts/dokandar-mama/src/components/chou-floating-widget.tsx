@@ -369,7 +369,10 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
                   onMicClick()
                 } else {
                   window.dispatchEvent(new CustomEvent("chotu:open_panel"))
-                  window.dispatchEvent(new CustomEvent("chotu:toggle_voice"))
+                  // Small delay lets the panel render & register its listener before we fire toggle_voice
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent("chotu:toggle_voice"))
+                  }, 80)
                 }
               }}
               className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold text-primary hover:bg-primary/5 transition-colors"

@@ -114,6 +114,9 @@ export function VoiceAssistant() {
   const processedRef = useRef(false)
   const langFallbackRef = useRef(false)
   const successTimerRef = useRef<number | null>(null)
+  // Stable refs so window event listeners always call the latest fn without re-subscribing
+  const startListeningRef = useRef<() => void>(() => {})
+  const stopListeningRef = useRef<() => void>(() => {})
 
   // Fetch contextual data so we can answer questions without a round trip per query.
   const { data: dashboard } = useGetDashboardOverview()
@@ -265,12 +268,19 @@ export function VoiceAssistant() {
     setPose("idle", "happy")
   }
 
+  // Keep refs up-to-date every render so event listeners always see the latest functions
+  useEffect(() => {
+    startListeningRef.current = () => void startListening()
+    stopListeningRef.current = stopListening
+  })
+
+  // Register window event listeners once — use stable refs to avoid stale closure issues
   useEffect(() => {
     const handleToggleVoice = () => {
-      if (isListening) {
-        stopListening()
+      if (recognitionRef.current) {
+        stopListeningRef.current()
       } else {
-        void startListening()
+        startListeningRef.current()
       }
     }
     const handleOpenPanel = () => {
@@ -282,7 +292,7 @@ export function VoiceAssistant() {
       window.removeEventListener("chotu:toggle_voice", handleToggleVoice)
       window.removeEventListener("chotu:open_panel", handleOpenPanel)
     }
-  }, [notSupported, isListening, language])
+  }, []) // Empty deps — stable refs handle reactivity
 
   const triggerSuccessState = () => {
     setChotuState("success")
