@@ -18,7 +18,7 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
     "nav.customers": "কাস্টমার ও বাকি",
     "nav.cashbox": "ক্যাশ বক্স",
     "nav.reports": "রিপোর্ট",
-    "nav.management": "ম্যানেজমেন্ট",
+    "nav.management": "শপ ম্যানেজমেন্ট",
     "nav.settings": "সেটিংস",
     "nav.assistant": "ছোটু মামা",
 
@@ -33,6 +33,22 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
     "dash.takePayment": "জমা নিন",
     "dash.closeDay": "দিন শেষ করুন",
 
+    // Management Hub
+    "mgnt.title": "দোকান ও ব্যবসা ব্যবস্থাপনা",
+    "mgnt.subtitle": "দোকান সেটিংস, টিম, বেচাকেনার রিপোর্ট ও সাবস্ক্রিপশন নিয়ন্ত্রণ করুন",
+    "mgnt.tab.overview": "দোকান ওভারভিউ",
+    "mgnt.tab.shops": "শাখা ও নতুন দোকান",
+    "mgnt.tab.team": "টিম ও রোল",
+    "mgnt.tab.reports": "রিপোর্ট ও অ্যানালিটিক্স",
+    "mgnt.tab.subscription": "সাবস্ক্রিপশন ও ফিচার",
+    "mgnt.addShop": "+ নতুন দোকান তৈরি করুন",
+    "mgnt.switchShop": "দোকান পরিবর্তন করুন",
+    "mgnt.inviteStaff": "কর্মী বা ম্যানেজার যুক্ত করুন",
+    "mgnt.staffRole": "রোল বা ক্ষমতা",
+    "mgnt.owner": "মালিক (Owner)",
+    "mgnt.manager": "ম্যানেজার (Manager)",
+    "mgnt.shopkeeper": "বিক্রেতা / ক্যাশিয়ার (Shopkeeper)",
+
     // Billing
     "billing.title": "দ্রুত ক্যাশমেমো ও বিক্রি",
     "billing.searchPlaceholder": "পণ্য খুঁজুন বা বারকোড স্ক্যান করুন...",
@@ -46,6 +62,15 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
     "billing.customerGave": "কাস্টমার দিয়েছেন",
     "billing.changeDue": "কাস্টমারকে ফেরত দিন",
     "billing.completeSale": "বিক্রি সম্পন্ন করুন",
+
+    // Reports
+    "reports.title": "রিপোর্ট ও বিশ্লেষণ",
+    "reports.subtitle": "দোকানের বেচাকেনা ও আর্থিক খতিয়ান",
+    "reports.export": "রিপোর্ট ডাউনলোড (CSV)",
+    "reports.print": "প্রিন্ট",
+    "reports.today": "আজকে",
+    "reports.week": "এই সপ্তাহ",
+    "reports.month": "এই মাস",
 
     // General & Network
     "status.online": "অনলাইন",
@@ -67,7 +92,7 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
     "nav.customers": "Customers & Due",
     "nav.cashbox": "Cash Box",
     "nav.reports": "Reports",
-    "nav.management": "Management",
+    "nav.management": "Shop Management",
     "nav.settings": "Settings",
     "nav.assistant": "Chotu Assistant",
 
@@ -82,6 +107,22 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
     "dash.takePayment": "Record Payment",
     "dash.closeDay": "Close Day",
 
+    // Management Hub
+    "mgnt.title": "Shop & Business Hub",
+    "mgnt.subtitle": "Manage shop profile, team members, financial reports & subscription plans",
+    "mgnt.tab.overview": "Shop Overview",
+    "mgnt.tab.shops": "Shops & Branches",
+    "mgnt.tab.team": "Team & Roles",
+    "mgnt.tab.reports": "Reports & Analytics",
+    "mgnt.tab.subscription": "Subscription & Features",
+    "mgnt.addShop": "+ Add New Shop",
+    "mgnt.switchShop": "Switch Active Shop",
+    "mgnt.inviteStaff": "Invite Staff / Manager",
+    "mgnt.staffRole": "Role / Access Level",
+    "mgnt.owner": "Owner",
+    "mgnt.manager": "Manager",
+    "mgnt.shopkeeper": "Shopkeeper / Cashier",
+
     // Billing
     "billing.title": "Fast POS & Billing",
     "billing.searchPlaceholder": "Search product or scan barcode...",
@@ -95,6 +136,15 @@ const DICTIONARY: Record<Language, Record<string, string>> = {
     "billing.customerGave": "Customer Paid",
     "billing.changeDue": "Return / Change Due",
     "billing.completeSale": "Complete Sale",
+
+    // Reports
+    "reports.title": "Reports & Analytics",
+    "reports.subtitle": "Business performance and financial insights",
+    "reports.export": "Export CSV",
+    "reports.print": "Print",
+    "reports.today": "Today",
+    "reports.week": "This Week",
+    "reports.month": "This Month",
 
     // General & Network
     "status.online": "Online",

@@ -1,5 +1,6 @@
 import {
   boolean,
+  index,
   integer,
   numeric,
   pgTable,
@@ -70,6 +71,7 @@ export const productsTable = pgTable(
     uniqueIndex("products_shop_id_barcode_unique")
       .on(table.shopId, table.barcode)
       .where(sql`${table.barcode} IS NOT NULL`),
+    index("idx_products_shop_name").on(table.shopId, table.name),
   ],
 );
 

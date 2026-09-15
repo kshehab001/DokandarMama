@@ -259,16 +259,10 @@ function Router() {
         </AuthedRoute>
       </Route>
       <Route path="/app/reports">
-        <AuthedRoute>
-          <RoleGuard minRole="manager" fallbackTitle="রিপোর্ট ও অ্যানালিটিক্স অ্যাক্সেস সংরক্ষিত">
-            <Reports />
-          </RoleGuard>
-        </AuthedRoute>
+        <Redirect to="/app/management?tab=reports" />
       </Route>
       <Route path="/app/subscriptions">
-        <AuthedRoute>
-          <SubscriptionsPage />
-        </AuthedRoute>
+        <Redirect to="/app/management?tab=subscription" />
       </Route>
       <Route path="/app/management">
         <AuthedRoute>

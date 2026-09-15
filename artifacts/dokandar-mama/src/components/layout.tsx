@@ -84,8 +84,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         { href: "/app/billing", label: t("nav.billing", "বিলিং"), icon: ShoppingCart },
         { href: "/app/inventory", label: language === "en" ? "Inventory" : category.terminology.stockLabel, icon: Package },
         { href: "/app/customers", label: language === "en" ? "Customers & Due" : category.terminology.bakiLabel, icon: Users },
-        { href: "/app/cashbox", label: t("nav.cashbox", "ক্যাশ বক্স"), icon: Wallet },
-        { href: "/app/reports", label: t("nav.reports", "রিপোর্ট"), icon: BarChart3 },
+        { href: "/app/management", label: t("nav.management", "শপ ম্যানেজমেন্ট"), icon: Crown },
       ]
     }
 
@@ -95,10 +94,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       { href: "/app/billing", label: t("nav.billing", "বিক্রি / POS"), icon: ShoppingCart },
       { href: "/app/inventory", label: language === "en" ? "Inventory" : category.terminology.stockLabel, icon: Package },
       { href: "/app/customers", label: language === "en" ? "Customers & Due" : category.terminology.bakiLabel, icon: Users },
-      { href: "/app/cashbox", label: t("nav.cashbox", "ক্যাশ বক্স"), icon: Wallet },
-      { href: "/app/reports", label: t("nav.reports", "আর্থিক খতিয়ান"), icon: BarChart3 },
-      { href: "/app/management", label: t("nav.management", "ম্যানেজমেন্ট"), icon: Crown },
-      { href: "/app/subscriptions", label: language === "en" ? "Subscription" : "সাবস্ক্রিপশন", icon: CreditCard },
+      { href: "/app/management", label: t("nav.management", "শপ ম্যানেজমেন্ট"), icon: Crown },
     ]
   })()
 
