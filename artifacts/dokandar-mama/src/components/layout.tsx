@@ -16,6 +16,7 @@ import {
   WifiOff,
   RefreshCw,
   Globe,
+  CreditCard,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { VoiceAssistant } from "./voice-assistant"
@@ -97,6 +98,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       { href: "/app/cashbox", label: t("nav.cashbox", "ক্যাশ বক্স"), icon: Wallet },
       { href: "/app/reports", label: t("nav.reports", "আর্থিক খতিয়ান"), icon: BarChart3 },
       { href: "/app/management", label: t("nav.management", "ম্যানেজমেন্ট"), icon: Crown },
+      { href: "/app/subscriptions", label: language === "en" ? "Subscription" : "সাবস্ক্রিপশন", icon: CreditCard },
     ]
   })()
 
@@ -286,4 +288,3 @@ export function Layout({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
-

@@ -12,6 +12,7 @@ import {
 } from "@workspace/api-zod";
 import { toNum } from "../lib/numeric";
 import { requireRole, requireShop } from "../lib/tenant";
+import { assertCanAddProduct } from "../lib/entitlements";
 
 const router: IRouter = Router();
 
@@ -81,34 +82,43 @@ router.post("/products", async (req, res): Promise<void> => {
     return;
   }
   const shopCtx = requireRole(req, "manager");
+  await assertCanAddProduct(shopCtx.shopId);
   const { name, barcode, category, unit, price, costPrice, stock } =
     parsed.data;
 
-  const [row] = await db
-    .insert(productsTable)
-    .values({
-      userId: shopCtx.userId,
-      shopId: shopCtx.shopId,
-      name,
-      barcode: barcode ?? null,
-      category,
-      unit,
-      price: String(price),
-      costPrice: costPrice === undefined ? null : String(costPrice),
-      stock: String(stock ?? 0),
-      lowStockThreshold:
-        parsed.data.lowStockThreshold === undefined
-          ? undefined
-          : String(parsed.data.lowStockThreshold),
-      isPriceVariable: parsed.data.isPriceVariable ?? false,
-      mfgDate: (parsed.data as any).mfgDate ? new Date((parsed.data as any).mfgDate) : null,
-      expiryDate: (parsed.data as any).expiryDate ? new Date((parsed.data as any).expiryDate) : null,
-      batchNumber: (parsed.data as any).batchNumber ?? null,
-      brand: (parsed.data as any).brand ?? null,
-    })
-    .returning();
+  try {
+    const [row] = await db
+      .insert(productsTable)
+      .values({
+        userId: shopCtx.userId,
+        shopId: shopCtx.shopId,
+        name,
+        barcode: barcode ?? null,
+        category,
+        unit,
+        price: String(price),
+        costPrice: costPrice === undefined ? null : String(costPrice),
+        stock: String(stock ?? 0),
+        lowStockThreshold:
+          parsed.data.lowStockThreshold === undefined
+            ? undefined
+            : String(parsed.data.lowStockThreshold),
+        isPriceVariable: parsed.data.isPriceVariable ?? false,
+        mfgDate: (parsed.data as any).mfgDate ? new Date((parsed.data as any).mfgDate) : null,
+        expiryDate: (parsed.data as any).expiryDate ? new Date((parsed.data as any).expiryDate) : null,
+        batchNumber: (parsed.data as any).batchNumber ?? null,
+        brand: (parsed.data as any).brand ?? null,
+      })
+      .returning();
 
-  res.status(201).json(serializeProduct(row, shopCtx.role));
+    res.status(201).json(serializeProduct(row, shopCtx.role));
+  } catch (err: any) {
+    if (err?.code === "23505" || err?.message?.includes("unique constraint")) {
+      res.status(409).json({ error: "এই বারকোডটি আপনার দোকানে ইতিমধ্যে অন্য একটি প্রোডাক্টে ব্যবহৃত হয়েছে।" });
+      return;
+    }
+    throw err;
+  }
 });
 
 router.get("/products/barcode/:code", async (req, res): Promise<void> => {
@@ -199,23 +209,31 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
   if ((data as any).brand !== undefined)
     updates.brand = (data as any).brand;
 
-  const [row] = await db
-    .update(productsTable)
-    .set(updates)
-    .where(
-      and(
-        eq(productsTable.id, params.data.id),
-        eq(productsTable.shopId, shopCtx.shopId),
-      ),
-    )
-    .returning();
+  try {
+    const [row] = await db
+      .update(productsTable)
+      .set(updates)
+      .where(
+        and(
+          eq(productsTable.id, params.data.id),
+          eq(productsTable.shopId, shopCtx.shopId),
+        ),
+      )
+      .returning();
 
-  if (!row) {
-    res.status(404).json({ error: "Product not found" });
-    return;
+    if (!row) {
+      res.status(404).json({ error: "Product not found" });
+      return;
+    }
+
+    res.json(serializeProduct(row, shopCtx.role));
+  } catch (err: any) {
+    if (err?.code === "23505" || err?.message?.includes("unique constraint")) {
+      res.status(409).json({ error: "এই বারকোডটি আপনার দোকানে ইতিমধ্যে অন্য একটি প্রোডাক্টে ব্যবহৃত হয়েছে।" });
+      return;
+    }
+    throw err;
   }
-
-  res.json(serializeProduct(row, shopCtx.role));
 });
 
 router.delete("/products/:id", async (req, res): Promise<void> => {

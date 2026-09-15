@@ -10,6 +10,7 @@ export type SubscriptionStateCurrentPlan = typeof SubscriptionStateCurrentPlan[k
 
 
 export const SubscriptionStateCurrentPlan = {
+  free: 'free',
   basic: 'basic',
   standard: 'standard',
   premium: 'premium',

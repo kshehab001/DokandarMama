@@ -10,6 +10,7 @@ export type SubscriptionSelectInputPlan = typeof SubscriptionSelectInputPlan[key
 
 
 export const SubscriptionSelectInputPlan = {
+  free: 'free',
   basic: 'basic',
   standard: 'standard',
   premium: 'premium',

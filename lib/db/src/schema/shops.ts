@@ -32,6 +32,7 @@ export const SHOP_CATEGORIES = [
 export type ShopCategory = (typeof SHOP_CATEGORIES)[number];
 
 export const SUBSCRIPTION_PLANS = [
+  "free",
   "basic",
   "standard",
   "premium",

@@ -15,6 +15,15 @@ import { toNum } from "../lib/numeric";
 const router: IRouter = Router();
 
 /**
+ * The browser uses this only to decide which platform-admin controls to show.
+ * Every admin data route below independently enforces the same server check.
+ */
+router.get("/admin/access", (req, res): void => {
+  requireSuperAdmin(req);
+  res.json({ superAdmin: true });
+});
+
+/**
  * Global overview statistics for Platform Super Admin
  */
 router.get("/admin/overview", async (req, res): Promise<void> => {

@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@workspace/api-client-react",
   "version": "0.0.0",
   "private": true,
@@ -8,6 +8,9 @@
   },
   "peerDependencies": {
     "react": ">=18",
+    "@tanstack/react-query": "catalog:"
+  },
+  "devDependencies": {
     "@tanstack/react-query": "catalog:"
   }
 }

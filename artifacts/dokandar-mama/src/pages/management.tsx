@@ -47,7 +47,8 @@ export function ManagementPage() {
   const queryClient = useQueryClient()
   const { activeShop: selectedShop, allShops, switchShop } = useShopTheme()
 
-  const { data: activeShop } = useGetCurrentShop()
+  const { data: currentShopData } = useGetCurrentShop()
+  const activeShop = currentShopData?.shop
   const updateShopMutation = useUpdateCurrentShop()
 
   // Shop Settings State
@@ -72,7 +73,16 @@ export function ManagementPage() {
 
   // Team Members Real API
   const { data: membersData = [], isLoading: isMembersLoading } = useQuery<
-    Array<{ id: number; userId: string; name: string | null; role: "admin" | "manager" | "shopkeeper"; createdAt: string }>
+    Array<{
+      id: number
+      userId: string
+      email?: string | null
+      name: string | null
+      role: "admin" | "manager" | "shopkeeper"
+      status?: "active" | "pending" | "revoked" | "expired"
+      invitedBy?: string | null
+      createdAt: string
+    }>
   >({
     queryKey: ["shop-members", activeShop?.id],
     queryFn: async () => {
@@ -91,6 +101,7 @@ export function ManagementPage() {
   const staffMembers = membersData.filter((m: any) => m.role !== "admin")
 
   const [newMemberName, setNewMemberName] = useState("")
+  const [newMemberEmail, setNewMemberEmail] = useState("")
   const [newMemberUserId, setNewMemberUserId] = useState("")
   const [newMemberRole, setNewMemberRole] = useState<"manager" | "shopkeeper">("shopkeeper")
   const [isAddingMember, setIsAddingMember] = useState(false)
@@ -153,8 +164,11 @@ export function ManagementPage() {
       toast({ title: "কর্মচারীর নাম লিখুন", variant: "destructive" })
       return
     }
+    if (!newMemberUserId.trim() && !newMemberEmail.trim()) {
+      toast({ title: "ইমেইল অথবা ইউজার আইডি লিখুন", variant: "destructive" })
+      return
+    }
 
-    const userIdToUse = newMemberUserId.trim() || `staff_${Date.now()}`
     setIsAddingMember(true)
     try {
       const res = await fetch("/api/shops/current/members", {
@@ -165,7 +179,8 @@ export function ManagementPage() {
         },
         body: JSON.stringify({
           name: newMemberName.trim(),
-          userId: userIdToUse,
+          userId: newMemberUserId.trim() || undefined,
+          email: newMemberEmail.trim() || undefined,
           role: newMemberRole,
         }),
       })
@@ -178,7 +193,8 @@ export function ManagementPage() {
       queryClient.invalidateQueries({ queryKey: ["shop-members", activeShop?.id] })
       setNewMemberName("")
       setNewMemberUserId("")
-      toast({ title: `✓ নতুন ${newMemberRole === "manager" ? "ম্যানেজার" : "বিক্রেতা"} যুক্ত হয়েছে` })
+      setNewMemberEmail("")
+      toast({ title: `✓ নতুন ${newMemberRole === "manager" ? "ম্যানেজার" : "বিক্রেতা"} যুক্ত/আমন্ত্রিত হয়েছে` })
     } catch (err: any) {
       toast({ title: err.message || "কর্মী যুক্ত করতে সমস্যা হয়েছে", variant: "destructive" })
     } finally {
@@ -292,7 +308,7 @@ export function ManagementPage() {
             <div>
               <CardTitle className="text-lg">টিম ও কর্মচারী একাউন্ট ব্যবস্থাপনা</CardTitle>
               <CardDescription>
-                ম্যানেজার ও বিক্রেতা (ক্যাশিয়ার) যোগ করুন — কর্মীরা নিজেদের পদ পরিবর্তন করতে পারবে না
+                ম্যানেজার ও বিক্রেতা (ক্যাশিয়ার) ইনভাইট করুন — কর্মীরা নিজেদের পদ পরিবর্তন করতে পারবে না
               </CardDescription>
             </div>
           </div>
@@ -301,9 +317,9 @@ export function ManagementPage() {
           {/* Add Member Form */}
           <form onSubmit={handleAddMember} className="p-4 rounded-2xl bg-muted/40 border border-border/80 space-y-3">
             <div className="font-bold text-xs text-foreground uppercase tracking-wider">
-              + নতুন কর্মী যুক্ত করুন
+              + নতুন কর্মী যুক্ত বা আমন্ত্রণ জানান
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div>
                 <Label className="text-xs font-semibold">নাম *</Label>
                 <Input
@@ -315,11 +331,21 @@ export function ManagementPage() {
                 />
               </div>
               <div>
-                <Label className="text-xs font-semibold">ইউজার আইডি / ফোন / ইমেইল</Label>
+                <Label className="text-xs font-semibold">ইমেইল (আমন্ত্রণ)</Label>
+                <Input
+                  type="email"
+                  value={newMemberEmail}
+                  onChange={(e) => setNewMemberEmail(e.target.value)}
+                  placeholder="staff@example.com"
+                  className="h-10 rounded-xl mt-1 bg-background text-xs"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold">ইউজার আইডি (অপশনাল)</Label>
                 <Input
                   value={newMemberUserId}
                   onChange={(e) => setNewMemberUserId(e.target.value)}
-                  placeholder="ইউজার আইডি বা মোবাইল নাম্বার"
+                  placeholder="user_..."
                   className="h-10 rounded-xl mt-1 bg-background font-mono text-xs"
                 />
               </div>
@@ -338,7 +364,7 @@ export function ManagementPage() {
             <div className="flex justify-end">
               <Button type="submit" size="sm" disabled={isAddingMember} className="rounded-xl font-bold gap-1.5 h-9">
                 <Plus className="h-4 w-4" />
-                {isAddingMember ? "যোগ হচ্ছে..." : "টিমে যোগ করুন"}
+                {isAddingMember ? "যোগ হচ্ছে..." : "ইনভাইট পাঠান / টিমে যোগ করুন"}
               </Button>
             </div>
           </form>
@@ -376,36 +402,52 @@ export function ManagementPage() {
                 কোনো অতিরিক্ত কর্মী যুক্ত নেই। ওপরের ফর্ম দিয়ে নতুন কর্মী যোগ করুন।
               </div>
             ) : (
-              staffMembers.map((m: any) => (
-                <div
-                  key={m.id}
-                  className="p-3.5 rounded-2xl bg-card border border-border flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-muted text-foreground flex items-center justify-center font-bold text-sm">
-                      👤
-                    </div>
-                    <div>
-                      <div className="font-bold text-sm text-foreground flex items-center gap-2">
-                        <span>{m.name || "অজ্ঞাত কর্মী"}</span>
-                        <Badge variant="outline" className="text-[10px]">
-                          {m.role === "manager" ? "ম্যানেজার" : "বিক্রেতা"}
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-muted-foreground font-mono">{m.userId}</div>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-lg"
-                    onClick={() => handleRemoveMember(m.id)}
+              staffMembers.map((m: any) => {
+                const status = m.status || "active"
+                return (
+                  <div
+                    key={m.id}
+                    className="p-3.5 rounded-2xl bg-card border border-border flex items-center justify-between"
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-muted text-foreground flex items-center justify-center font-bold text-sm">
+                        👤
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm text-foreground flex items-center gap-2">
+                          <span>{m.name || "অজ্ঞাত কর্মী"}</span>
+                          <Badge variant="outline" className="text-[10px]">
+                            {m.role === "manager" ? "ম্যানেজার" : "বিক্রেতা"}
+                          </Badge>
+                          <Badge
+                            className={`text-[10px] ${
+                              status === "active"
+                                ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                                : status === "pending"
+                                ? "bg-amber-500/15 text-amber-600 border-amber-500/30"
+                                : "bg-rose-500/15 text-rose-600 border-rose-500/30"
+                            }`}
+                          >
+                            {status === "active" ? "সক্রিয় (Active)" : status === "pending" ? "অপেক্ষমান (Pending)" : "বাতিল (Revoked)"}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground font-mono">
+                          {m.email ? m.email : m.userId}
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-lg"
+                      onClick={() => handleRemoveMember(m.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )
+              })
             )}
           </div>
         </CardContent>

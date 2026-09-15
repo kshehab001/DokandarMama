@@ -18,6 +18,7 @@ import {
   requireShop,
   resolveShopContext,
 } from "../lib/tenant";
+import { assertCanAddMember, assertCanCreateShop } from "../lib/entitlements";
 
 const router: IRouter = Router();
 
@@ -41,11 +42,16 @@ const UpdateShopBody = z.object({
   enabledPaymentMethods: z.array(z.string()).optional(),
 });
 
-const AddMemberBody = z.object({
-  userId: z.string().trim().min(1).max(120),
-  name: z.string().trim().max(120).optional(),
-  role: z.enum(SHOP_ROLES),
-});
+const AddMemberBody = z
+  .object({
+    userId: z.string().trim().max(120).optional(),
+    email: z.string().trim().email().optional(),
+    name: z.string().trim().max(120).optional(),
+    role: z.enum(SHOP_ROLES),
+  })
+  .refine((d) => d.userId || d.email, {
+    message: "User ID অথবা Email দিতে হবে",
+  });
 
 function serializeShop(row: typeof shopsTable.$inferSelect) {
   return {
@@ -121,6 +127,9 @@ router.post("/shops", async (req, res): Promise<void> => {
   const { name, category, ownerName, area, organizationName } = parsed.data;
 
   const isFirstShop = (await resolveShopContext(req)) === null;
+  if (!isFirstShop) {
+    await assertCanCreateShop(userId);
+  }
 
   const shop = await db.transaction(async (tx) => {
     let organizationId: number | null = null;
@@ -249,8 +258,11 @@ router.get("/shops/current/members", async (req, res): Promise<void> => {
     rows.map((r) => ({
       id: r.id,
       userId: r.userId,
+      email: r.email,
       name: r.name,
       role: r.role,
+      status: r.status,
+      invitedBy: r.invitedBy,
       createdAt: r.createdAt.toISOString(),
     })),
   );
@@ -268,25 +280,40 @@ router.post("/shops/current/members", async (req, res): Promise<void> => {
     throw new RouteError(403, "অ্যাডমিন বা মালিক রোল যোগ করা যাবে না। শুধুমাত্র ম্যানেজার ও দোকানদার যোগ করা যাবে।");
   }
 
+  await assertCanAddMember(ctx.shopId);
+
+  const memberUserId = parsed.data.userId || `invited_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const status = parsed.data.userId ? "active" : "pending";
+
   const [row] = await db
     .insert(shopUsersTable)
     .values({
       shopId: ctx.shopId,
-      userId: parsed.data.userId,
+      userId: memberUserId,
+      email: parsed.data.email ?? null,
       name: parsed.data.name ?? null,
       role: parsed.data.role,
+      status,
+      invitedBy: ctx.userId,
     })
     .onConflictDoUpdate({
       target: [shopUsersTable.shopId, shopUsersTable.userId],
-      set: { role: parsed.data.role, name: parsed.data.name ?? null },
+      set: {
+        role: parsed.data.role,
+        name: parsed.data.name ?? null,
+        email: parsed.data.email ?? null,
+        status,
+      },
     })
     .returning();
 
   res.status(201).json({
     id: row.id,
     userId: row.userId,
+    email: row.email,
     name: row.name,
     role: row.role,
+    status: row.status,
   });
 });
 

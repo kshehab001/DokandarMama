@@ -27,6 +27,7 @@ import { Landing } from '@/pages/landing';
 import { SignInPage } from '@/pages/sign-in';
 import { SignUpPage } from '@/pages/sign-up';
 import { ManagementPage } from '@/pages/management';
+import { SubscriptionsPage } from '@/pages/subscriptions';
 
 const queryClient = new QueryClient();
 
@@ -262,6 +263,11 @@ function Router() {
           <RoleGuard minRole="manager" fallbackTitle="রিপোর্ট ও অ্যানালিটিক্স অ্যাক্সেস সংরক্ষিত">
             <Reports />
           </RoleGuard>
+        </AuthedRoute>
+      </Route>
+      <Route path="/app/subscriptions">
+        <AuthedRoute>
+          <SubscriptionsPage />
         </AuthedRoute>
       </Route>
       <Route path="/app/management">

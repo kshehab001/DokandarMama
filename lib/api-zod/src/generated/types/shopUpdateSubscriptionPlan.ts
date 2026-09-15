@@ -10,6 +10,7 @@ export type ShopUpdateSubscriptionPlan = typeof ShopUpdateSubscriptionPlan[keyof
 
 
 export const ShopUpdateSubscriptionPlan = {
+  free: 'free',
   basic: 'basic',
   standard: 'standard',
   premium: 'premium',

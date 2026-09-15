@@ -100,29 +100,19 @@ export function requirePermission(req: Request, action: ResourceAction): ShopCon
 }
 
 /**
- * Super Admin check: Evaluates whether user is a platform administrator.
+ * Platform administration is deliberately separate from shop membership.
+ *
+ * Only immutable Clerk user IDs configured on the server may grant this
+ * capability. Request headers and email-address heuristics are client
+ * controlled (or mutable) and must never authorize cross-tenant access.
  */
-export function isSuperAdminUser(userId: string, req?: Request): boolean {
-  const superAdminEmails = (process.env.SUPER_ADMIN_EMAILS || "")
+export function isSuperAdminUser(userId: string): boolean {
+  const superAdminUserIds = (process.env.SUPER_ADMIN_USER_IDS || "")
     .split(",")
-    .map((e) => e.trim().toLowerCase())
+    .map((id) => id.trim())
     .filter(Boolean);
 
-  const reqEmail = req?.header("x-user-email")?.toLowerCase();
-  if (reqEmail && superAdminEmails.includes(reqEmail)) {
-    return true;
-  }
-
-  // Developer / primary super admin IDs & emails fallback
-  if (
-    userId.includes("admin") ||
-    reqEmail?.includes("admin@dokandarmama") ||
-    reqEmail?.includes("kshehab235723@gmail.com")
-  ) {
-    return true;
-  }
-
-  return false;
+  return superAdminUserIds.includes(userId);
 }
 
 /**
@@ -130,7 +120,7 @@ export function isSuperAdminUser(userId: string, req?: Request): boolean {
  */
 export function requireSuperAdmin(req: Request): { userId: string } {
   const userId = getUserId(req);
-  if (!isSuperAdminUser(userId, req)) {
+  if (!isSuperAdminUser(userId)) {
     throw new RouteError(403, "প্ল্যাটফর্ম সুপার অ্যাডমিন অ্যাক্সেস প্রয়োজন");
   }
   return { userId };

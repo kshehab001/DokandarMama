@@ -505,7 +505,7 @@ export const ListShopsResponseItem = zod.object({
   "category": zod.string(),
   "ownerName": zod.string().nullish(),
   "area": zod.string().nullish(),
-  "subscriptionPlan": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "subscriptionPlan": zod.enum(['free', 'basic', 'standard', 'premium', 'organization']),
   "cashboxAddon": zod.boolean().optional(),
   "createdAt": zod.string()
 }).and(zod.object({
@@ -535,7 +535,7 @@ export const CreateShopResponse = zod.object({
   "category": zod.string(),
   "ownerName": zod.string().nullish(),
   "area": zod.string().nullish(),
-  "subscriptionPlan": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "subscriptionPlan": zod.enum(['free', 'basic', 'standard', 'premium', 'organization']),
   "cashboxAddon": zod.boolean().optional(),
   "createdAt": zod.string()
 })
@@ -552,7 +552,7 @@ export const GetCurrentShopResponse = zod.object({
   "category": zod.string(),
   "ownerName": zod.string().nullish(),
   "area": zod.string().nullish(),
-  "subscriptionPlan": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "subscriptionPlan": zod.enum(['free', 'basic', 'standard', 'premium', 'organization']),
   "cashboxAddon": zod.boolean().optional(),
   "createdAt": zod.string()
 }),zod.null()]).optional(),
@@ -575,7 +575,7 @@ export const UpdateCurrentShopBody = zod.object({
   "category": zod.string().optional(),
   "ownerName": zod.string().optional(),
   "area": zod.string().optional(),
-  "subscriptionPlan": zod.enum(['basic', 'standard', 'premium', 'organization']).optional(),
+  "subscriptionPlan": zod.enum(['free', 'basic', 'standard', 'premium', 'organization']).optional(),
   "cashboxAddon": zod.boolean().optional()
 })
 
@@ -586,7 +586,7 @@ export const UpdateCurrentShopResponse = zod.object({
   "category": zod.string(),
   "ownerName": zod.string().nullish(),
   "area": zod.string().nullish(),
-  "subscriptionPlan": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "subscriptionPlan": zod.enum(['free', 'basic', 'standard', 'premium', 'organization']),
   "cashboxAddon": zod.boolean().optional(),
   "createdAt": zod.string()
 })
@@ -613,7 +613,7 @@ export const CreateBranchResponse = zod.object({
   "category": zod.string(),
   "ownerName": zod.string().nullish(),
   "area": zod.string().nullish(),
-  "subscriptionPlan": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "subscriptionPlan": zod.enum(['free', 'basic', 'standard', 'premium', 'organization']),
   "cashboxAddon": zod.boolean().optional(),
   "createdAt": zod.string()
 })
@@ -996,12 +996,12 @@ export const ConfirmPurchaseInvoiceResponse = zod.object({
  */
 export const GetSubscriptionResponse = zod.object({
   "plans": zod.array(zod.object({
-  "id": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "id": zod.enum(['free', 'basic', 'standard', 'premium', 'organization']),
   "name": zod.string(),
   "price": zod.number().nullish(),
   "features": zod.array(zod.string())
 })),
-  "currentPlan": zod.enum(['basic', 'standard', 'premium', 'organization']),
+  "currentPlan": zod.enum(['free', 'basic', 'standard', 'premium', 'organization']),
   "role": zod.string().nullish(),
   "history": zod.array(zod.object({
   "id": zod.number(),
@@ -1017,7 +1017,7 @@ export const GetSubscriptionResponse = zod.object({
  * @summary Record a plan selection (no payment yet)
  */
 export const SelectSubscriptionPlanBody = zod.object({
-  "plan": zod.enum(['basic', 'standard', 'premium', 'organization'])
+  "plan": zod.enum(['free', 'basic', 'standard', 'premium', 'organization'])
 })
 
 export const SelectSubscriptionPlanResponse = zod.object({

@@ -18,6 +18,9 @@ import { shopsTable } from "./shops";
 export const SHOP_ROLES = ["admin", "manager", "shopkeeper"] as const;
 export type ShopRole = (typeof SHOP_ROLES)[number];
 
+export const SHOP_USER_STATUS = ["active", "pending", "revoked", "expired"] as const;
+export type ShopUserStatus = (typeof SHOP_USER_STATUS)[number];
+
 /** Membership of a Clerk user in a shop, with their role in that shop. */
 export const shopUsersTable = pgTable(
   "shop_users",
@@ -28,10 +31,17 @@ export const shopUsersTable = pgTable(
       .references(() => shopsTable.id, { onDelete: "cascade" }),
     userId: text("user_id").notNull(),
     name: text("name"),
+    email: text("email"),
     role: text("role", { enum: SHOP_ROLES }).notNull().default("shopkeeper"),
+    status: text("status", { enum: SHOP_USER_STATUS }).notNull().default("active"),
+    invitedBy: text("invited_by"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [unique("shop_users_shop_id_user_id_key").on(table.shopId, table.userId)],
 );
@@ -39,6 +49,7 @@ export const shopUsersTable = pgTable(
 export const insertShopUserSchema = createInsertSchema(shopUsersTable).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 export type InsertShopUser = z.infer<typeof insertShopUserSchema>;
 export type ShopUser = typeof shopUsersTable.$inferSelect;

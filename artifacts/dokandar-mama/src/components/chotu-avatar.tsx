@@ -81,15 +81,14 @@ export function ChotuAvatar({
 
   useEffect(() => {
     const next = getSpriteUrl(activePose)
-    if (next !== currentSprite) {
-      setPrevSprite(currentSprite)
-      setFadeIn(false)
-      const t = setTimeout(() => {
-        setCurrentSprite(next)
-        setFadeIn(true)
-      }, 150)
-      return () => clearTimeout(t)
-    }
+    if (next === currentSprite) return
+    setPrevSprite(currentSprite)
+    setFadeIn(false)
+    const t = setTimeout(() => {
+      setCurrentSprite(next)
+      setFadeIn(true)
+    }, 150)
+    return () => clearTimeout(t)
   }, [activePose]) // eslint-disable-line
 
   return (

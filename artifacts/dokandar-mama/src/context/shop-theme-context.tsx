@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from "react"
 import { useUser } from "@clerk/react"
 import {
+  customFetch,
   useListShops,
   useGetCurrentShop,
   useUpdateCurrentShop,
@@ -8,7 +9,7 @@ import {
   getListShopsQueryKey,
   type Shop,
 } from "@workspace/api-client-react"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   CATEGORY_THEMES,
   getCategoryTheme,
@@ -51,20 +52,25 @@ export function ShopThemeProvider({ children }: { children: React.ReactNode }) {
   const serverRole = currentShopData?.role ?? "admin" // admin in DB = owner
   const allShops = (allShopsData as Array<Shop & { role?: string }>) ?? []
 
-  // Check if current user is platform super admin (via Clerk metadata or email)
-  const isSuperAdminEmail =
-    user?.primaryEmailAddress?.emailAddress?.includes("admin@dokandarmama") ||
-    user?.primaryEmailAddress?.emailAddress?.includes("kshehab235723@gmail.com") ||
-    Boolean((user?.publicMetadata as any)?.isSuperAdmin)
+  // Display-only admin state is always confirmed by the secured server route.
+  // Browser metadata and request headers must never grant platform access.
+  const isAdminRoute = typeof window !== "undefined" && window.location.pathname.startsWith("/admin")
+  const { data: adminAccess } = useQuery({
+    queryKey: ["admin-access"],
+    queryFn: () => customFetch<{ superAdmin: true }>("/api/admin/access", { responseType: "json" }),
+    enabled: Boolean(user) && isAdminRoute,
+    retry: false,
+  })
+  const isSuperAdmin = adminAccess?.superAdmin === true
 
   // Map server role to user role hierarchy:
   // "admin" -> "owner", "manager" -> "manager", "shopkeeper" -> "shopkeeper"
   const derivedRole: UserRole = useMemo(() => {
-    if (isSuperAdminEmail && window.location.pathname.startsWith("/admin")) return "superadmin"
+    if (isSuperAdmin) return "superadmin"
     if (serverRole === "admin") return "owner"
     if (serverRole === "manager") return "manager"
     return "shopkeeper"
-  }, [serverRole, isSuperAdminEmail])
+  }, [serverRole, isSuperAdmin])
 
   // Active Category
   const activeCategoryId: ShopCategoryId = useMemo(() => {

@@ -10,6 +10,7 @@ export type SubscriptionPlanInfoId = typeof SubscriptionPlanInfoId[keyof typeof 
 
 
 export const SubscriptionPlanInfoId = {
+  free: 'free',
   basic: 'basic',
   standard: 'standard',
   premium: 'premium',
