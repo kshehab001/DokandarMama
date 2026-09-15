@@ -19,6 +19,7 @@ import {
   resolveShopContext,
 } from "../lib/tenant";
 import { assertCanAddMember, assertCanCreateShop } from "../lib/entitlements";
+import { sendClerkInvitation } from "../lib/clerk";
 
 const router: IRouter = Router();
 
@@ -282,7 +283,37 @@ router.post("/shops/current/members", async (req, res): Promise<void> => {
 
   await assertCanAddMember(ctx.shopId);
 
-  const memberUserId = parsed.data.userId || `invited_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  let clerkInvitationId: string | null = null;
+  if (parsed.data.email) {
+    const rawOrigin = req.header("origin") || req.header("referer");
+    let origin = rawOrigin ? new URL(rawOrigin).origin : null;
+    if (!origin) {
+      origin = process.env.PUBLIC_APP_URL || process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+    }
+    const redirectUrl = `${origin.replace(/\/$/, "")}/sign-up`;
+
+    try {
+      const inv = await sendClerkInvitation({
+        emailAddress: parsed.data.email,
+        redirectUrl,
+        shopId: ctx.shopId,
+        role: parsed.data.role,
+      });
+      clerkInvitationId = inv.id;
+    } catch (err: any) {
+      console.error("Failed to dispatch Clerk invitation email:", err?.message || err);
+      throw new RouteError(
+        400,
+        `ইনভাইটেশন ইমেইল পাঠানো সম্ভব হয়নি: ${err?.message || "ইনভাইটেশন সার্ভিস সমস্যা"}`,
+      );
+    }
+  }
+
+  const memberUserId =
+    parsed.data.userId ||
+    (clerkInvitationId
+      ? `clerk_inv_${clerkInvitationId}`
+      : `invited_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
   const status = parsed.data.userId ? "active" : "pending";
 
   const [row] = await db

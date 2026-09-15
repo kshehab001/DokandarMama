@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, ne } from "drizzle-orm";
 import {
   customersTable,
   db,
@@ -12,6 +12,7 @@ import {
 } from "@workspace/db";
 import { getUserId } from "./auth";
 import { RouteError } from "./numeric";
+import { getClerkUserPrimaryEmail } from "./clerk";
 
 export interface ShopContext {
   shopId: number;
@@ -38,15 +39,14 @@ const ROLE_RANK: Record<ShopRole, number> = {
  *
  * The client may *suggest* a shop with the `x-shop-id` header (used by chain
  * shops to switch between branches), but the suggestion is only honoured when
- * the authenticated Clerk user actually has a `shop_users` membership for it.
- * A shop_id sent by the frontend is never trusted on its own.
+ * the authenticated Clerk user actually has an active `shop_users` membership.
  */
 export async function resolveShopContext(
   req: Request,
 ): Promise<ShopContext | null> {
   const userId = getUserId(req);
 
-  const memberships = await db
+  let memberships = await db
     .select({
       shopId: shopUsersTable.shopId,
       role: shopUsersTable.role,
@@ -54,7 +54,54 @@ export async function resolveShopContext(
     })
     .from(shopUsersTable)
     .innerJoin(shopsTable, eq(shopsTable.id, shopUsersTable.shopId))
-    .where(eq(shopUsersTable.userId, userId));
+    .where(
+      and(
+        eq(shopUsersTable.userId, userId),
+        ne(shopUsersTable.status, "revoked"),
+      ),
+    );
+
+  // Auto-claim pending email invitations upon user authentication
+  if (memberships.length === 0) {
+    const userEmail = await getClerkUserPrimaryEmail(userId);
+    if (userEmail) {
+      const [pendingInv] = await db
+        .select()
+        .from(shopUsersTable)
+        .where(
+          and(
+            eq(shopUsersTable.email, userEmail),
+            eq(shopUsersTable.status, "pending"),
+          ),
+        );
+
+      if (pendingInv) {
+        await db
+          .update(shopUsersTable)
+          .set({
+            userId,
+            status: "active",
+            updatedAt: new Date(),
+          })
+          .where(eq(shopUsersTable.id, pendingInv.id));
+
+        memberships = await db
+          .select({
+            shopId: shopUsersTable.shopId,
+            role: shopUsersTable.role,
+            organizationId: shopsTable.organizationId,
+          })
+          .from(shopUsersTable)
+          .innerJoin(shopsTable, eq(shopsTable.id, shopUsersTable.shopId))
+          .where(
+            and(
+              eq(shopUsersTable.userId, userId),
+              ne(shopUsersTable.status, "revoked"),
+            ),
+          );
+      }
+    }
+  }
 
   if (memberships.length === 0) return null;
 
