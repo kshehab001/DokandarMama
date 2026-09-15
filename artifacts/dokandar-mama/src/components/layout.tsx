@@ -1,4 +1,5 @@
 import { Link, useLocation } from "wouter"
+import { useState } from "react"
 import {
   Home,
   ShoppingCart,
@@ -17,6 +18,9 @@ import {
   RefreshCw,
   Globe,
   CreditCard,
+  ChevronDown,
+  Check,
+  PlusCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { VoiceAssistant } from "./voice-assistant"
@@ -42,6 +46,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
   const { signOut } = useClerk()
   const { user } = useUser()
+  const [shopSwitcherOpen, setShopSwitcherOpen] = useState(false)
 
   const {
     category,
@@ -51,6 +56,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
     isManager,
     isShopkeeper,
     activeShop,
+    allShops,
+    switchShop,
   } = useShopTheme()
 
   const { language, toggleLanguage, t } = useLanguage()
@@ -190,15 +197,51 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          {/* Active shop and role */}
+          {/* Active shop — switcher when owner has >1 shop */}
           <div className="space-y-2">
-            <div className="w-full flex items-center gap-2 p-2.5 rounded-xl border bg-muted/30 text-left">
-              <div className="p-1.5 rounded-lg bg-primary/10 text-primary">
-                <Building2 className="w-4 h-4" />
-              </div>
-              <div className="text-xs font-bold text-foreground truncate">
-                {activeShop?.name || (user?.unsafeMetadata as any)?.shopName || "আপনার দোকান"}
-              </div>
+            <div className="relative">
+              <button
+                onClick={() => isOwner && allShops.length > 1 ? setShopSwitcherOpen(o => !o) : undefined}
+                className={cn(
+                  "w-full flex items-center gap-2 p-2.5 rounded-xl border bg-muted/30 text-left",
+                  isOwner && allShops.length > 1 ? "hover:bg-muted/60 cursor-pointer transition-colors" : "cursor-default"
+                )}
+              >
+                <div className="p-1.5 rounded-lg bg-primary/10 text-primary shrink-0">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <div className="flex-1 text-xs font-bold text-foreground truncate">
+                  {activeShop?.name || (user?.unsafeMetadata as any)?.shopName || "আপনার দোকান"}
+                </div>
+                {isOwner && allShops.length > 1 && (
+                  <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform", shopSwitcherOpen && "rotate-180")} />
+                )}
+              </button>
+
+              {/* Shop dropdown */}
+              {shopSwitcherOpen && isOwner && allShops.length > 1 && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-card border rounded-xl shadow-lg z-50 overflow-hidden">
+                  {allShops.map((shop) => (
+                    <button
+                      key={shop.id}
+                      onClick={() => { switchShop(shop.id); setShopSwitcherOpen(false) }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-muted/60 transition-colors text-left"
+                    >
+                      <Building2 className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span className="flex-1 truncate">{shop.name}</span>
+                      {shop.id === activeShop?.id && <Check className="w-3.5 h-3.5 text-primary shrink-0" />}
+                    </button>
+                  ))}
+                  <Link
+                    href="/app/management?tab=shop"
+                    onClick={() => setShopSwitcherOpen(false)}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-primary hover:bg-primary/5 transition-colors border-t"
+                  >
+                    <PlusCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{language === "en" ? "Add New Shop" : "নতুন দোকান যোগ করুন"}</span>
+                  </Link>
+                </div>
+              )}
             </div>
 
             {/* Read-Only Role Badge */}

@@ -39,22 +39,34 @@ router.post("/chotu/chat", async (req, res): Promise<void> => {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todaySales = sales.filter((sale) => sale.createdAt >= todayStart);
+
+  // Pre-computed summaries — never send raw arrays to the AI
+  const lowStockItems = products
+    .filter((p) => {
+      const stock = toNum(p.stock);
+      const threshold = toNum(p.lowStockThreshold);
+      return stock <= (threshold > 0 ? threshold : 5);
+    })
+    .sort((a, b) => toNum(a.stock) - toNum(b.stock))
+    .slice(0, 20)
+    .map((p) => ({ name: p.name, stock: toNum(p.stock), unit: p.unit }));
+
+  const topDebtors = [...customers]
+    .filter((c) => toNum(c.bakiBalance) > 0)
+    .sort((a, b) => toNum(b.bakiBalance) - toNum(a.bakiBalance))
+    .slice(0, 10)
+    .map((c) => ({ name: c.name, due: toNum(c.bakiBalance) }));
+
   const shopContext = {
     generatedAt: new Date().toISOString(),
-    todaySales: todaySales.reduce((sum, sale) => sum + toNum(sale.total), 0),
+    totalProducts: products.length,
+    totalCustomers: customers.length,
+    todaySalesAmount: todaySales.reduce((sum, sale) => sum + toNum(sale.total), 0),
     todayTransactionCount: todaySales.length,
-    totalDue: customers.reduce((sum, customer) => sum + toNum(customer.bakiBalance), 0),
-    products: products.slice(0, 120).map((product) => ({
-      name: product.name,
-      stock: toNum(product.stock),
-      unit: product.unit,
-      price: toNum(product.price),
-      lowStockThreshold: toNum(product.lowStockThreshold),
-    })),
-    customers: customers.slice(0, 120).map((customer) => ({
-      name: customer.name,
-      due: toNum(customer.bakiBalance),
-    })),
+    totalDueAmount: customers.reduce((sum, c) => sum + toNum(c.bakiBalance), 0),
+    customersWithDue: customers.filter((c) => toNum(c.bakiBalance) > 0).length,
+    lowStockItems,   // up to 20
+    topDebtors,      // up to 10
   };
 
   const instructions = language === "en"

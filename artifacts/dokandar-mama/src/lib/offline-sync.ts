@@ -16,17 +16,25 @@ export interface QueuedPayment {
   retryCount: number
 }
 
-const STORAGE_KEYS = {
-  SALES_QUEUE: "dokandar_offline_sales_queue",
-  PAYMENTS_QUEUE: "dokandar_offline_payments_queue",
-  CACHED_PRODUCTS: "dokandar_offline_products_cache",
-  CACHED_CUSTOMERS: "dokandar_offline_customers_cache",
+/** Returns the currently active shop ID stored by ShopThemeProvider */
+function getActiveShopId(): string {
+  return localStorage.getItem("dokandar_active_shop_id") ?? "0"
+}
+
+function storageKeys() {
+  const shopId = getActiveShopId()
+  return {
+    SALES_QUEUE: `dokandar_offline_sales_queue_${shopId}`,
+    PAYMENTS_QUEUE: `dokandar_offline_payments_queue_${shopId}`,
+    CACHED_PRODUCTS: `dokandar_offline_products_cache_${shopId}`,
+    CACHED_CUSTOMERS: `dokandar_offline_customers_cache_${shopId}`,
+  }
 }
 
 // Queue Management
 export function getOfflineSalesQueue(): QueuedSale[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.SALES_QUEUE)
+    const raw = localStorage.getItem(storageKeys().SALES_QUEUE)
     return raw ? JSON.parse(raw) : []
   } catch {
     return []
@@ -35,7 +43,7 @@ export function getOfflineSalesQueue(): QueuedSale[] {
 
 export function saveOfflineSalesQueue(queue: QueuedSale[]) {
   try {
-    localStorage.setItem(STORAGE_KEYS.SALES_QUEUE, JSON.stringify(queue))
+    localStorage.setItem(storageKeys().SALES_QUEUE, JSON.stringify(queue))
   } catch {}
 }
 
@@ -54,7 +62,7 @@ export function queueOfflineSale(payload: any): string {
 
 export function getOfflinePaymentsQueue(): QueuedPayment[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.PAYMENTS_QUEUE)
+    const raw = localStorage.getItem(storageKeys().PAYMENTS_QUEUE)
     return raw ? JSON.parse(raw) : []
   } catch {
     return []
@@ -63,7 +71,7 @@ export function getOfflinePaymentsQueue(): QueuedPayment[] {
 
 export function saveOfflinePaymentsQueue(queue: QueuedPayment[]) {
   try {
-    localStorage.setItem(STORAGE_KEYS.PAYMENTS_QUEUE, JSON.stringify(queue))
+    localStorage.setItem(storageKeys().PAYMENTS_QUEUE, JSON.stringify(queue))
   } catch {}
 }
 
@@ -105,6 +113,7 @@ export async function syncOfflineQueueToServer(): Promise<{ synced: number; fail
         headers: {
           "Content-Type": "application/json",
           "x-idempotency-key": item.idempotencyKey,
+          "x-shop-id": getActiveShopId(),
         },
         body: JSON.stringify(item.payload),
       })
@@ -134,6 +143,7 @@ export async function syncOfflineQueueToServer(): Promise<{ synced: number; fail
         headers: {
           "Content-Type": "application/json",
           "x-idempotency-key": item.idempotencyKey,
+          "x-shop-id": getActiveShopId(),
         },
         body: JSON.stringify(item.payload),
       })
