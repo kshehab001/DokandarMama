@@ -67,12 +67,25 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? "")
   .filter(Boolean)
   .map((origin) => (origin.startsWith("http") ? origin : `https://${origin}`));
 
+// Native mobile (Capacitor/Android/iOS) and local webview origins
+const mobileOrigins = new Set([
+  "https://localhost",
+  "http://localhost",
+  "capacitor://localhost",
+  "http://localhost:5173",
+]);
+
 app.use(
   cors({
     credentials: true,
     origin(origin, callback) {
       // Same-origin/non-browser requests (curl, health checks) send no Origin header.
-      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.length === 0 ||
+        allowedOrigins.includes(origin) ||
+        mobileOrigins.has(origin)
+      ) {
         callback(null, true);
         return;
       }
@@ -122,7 +135,8 @@ if (staticDir) {
     // Serve static files (assets, images, scripts) without serving raw index.html for "/"
     app.use(express.static(resolvedDir, { index: false }));
 
-    app.get("/", (_req, res) => {
+    // Serve index.html for root and all SPA client-side routes (excluding /api, /health, /diagnostics)
+    app.get(["/", "/index.html", "/app", "/app/*", "/sign-in", "/sign-in/*", "/sign-up", "/sign-up/*", "/admin", "/admin/*"], (_req, res) => {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       const html = getInjectedIndexHtml(indexHtmlPath);
       res.send(html);

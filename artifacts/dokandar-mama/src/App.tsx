@@ -76,9 +76,18 @@ const rawClerkKey =
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ||
   (typeof window !== 'undefined' && (window as any).__CLERK_PUBLISHABLE_KEY__) ||
   '';
-const clerkPubKey = rawClerkKey
-  ? (publishableKeyFromHost(window.location.hostname, rawClerkKey) || rawClerkKey)
-  : '';
+let clerkPubKey = rawClerkKey;
+if (rawClerkKey) {
+  try {
+    const hostKey =
+      typeof window !== 'undefined' && window.location?.hostname
+        ? publishableKeyFromHost(window.location.hostname, rawClerkKey)
+        : null;
+    clerkPubKey = hostKey || rawClerkKey;
+  } catch {
+    clerkPubKey = rawClerkKey;
+  }
+}
 
 // REQUIRED — copy verbatim. Empty in dev (Clerk hits dev FAPI directly), auto-set
 // in prod. Do NOT gate on import.meta.env.PROD / NODE_ENV — the empty dev value
@@ -219,6 +228,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={HomeRedirect} />
+      <Route path="/index.html" component={HomeRedirect} />
 
       {/* REQUIRED — copy "/sign-in/*?" and "/sign-up/*?" verbatim. */}
       <Route path="/sign-in/*?" component={SignInPage} />
@@ -356,21 +366,27 @@ function ClerkProviderWithRoutes() {
   );
 }
 
-function App() {
+function AppContent() {
   if (!clerkPubKey) {
     return <MissingClerkConfigScreen />;
   }
 
   return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <WouterRouter base={basePath}>
+          <ClerkProviderWithRoutes />
+        </WouterRouter>
+        <Toaster />
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+}
+
+function App() {
+  return (
     <AppErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <WouterRouter base={basePath}>
-            <ClerkProviderWithRoutes />
-          </WouterRouter>
-          <Toaster />
-        </TooltipProvider>
-      </QueryClientProvider>
+      <AppContent />
     </AppErrorBoundary>
   );
 }
