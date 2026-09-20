@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { useCreateShop, useGetCurrentShop, getGetCurrentShopQueryKey, getListShopsQueryKey } from "@workspace/api-client-react"
+import { useCreateShop, useGetCurrentShop, getGetCurrentShopQueryKey, getListShopsQueryKey, customFetch } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { CATEGORY_LIST, type ShopCategoryId } from "@/lib/theme-config"
 import { cn } from "@/lib/utils"
@@ -41,7 +41,8 @@ export function ShopOnboardingGate({ children }: { children: React.ReactNode }) 
       const params = new URLSearchParams(window.location.search)
       const codeFromUrl = params.get("invite") || params.get("code")
       if (codeFromUrl) {
-        setInviteCode(codeFromUrl.toUpperCase())
+        const clean = codeFromUrl.trim().toUpperCase()
+        setInviteCode(clean)
         setActiveTab("join")
       }
     }

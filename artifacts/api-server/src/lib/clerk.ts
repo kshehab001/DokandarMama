@@ -37,6 +37,14 @@ export async function sendClerkInvitation(params: {
  * Retrieves the primary email address of a signed-in Clerk user.
  */
 export async function getClerkUserPrimaryEmail(userId: string): Promise<string | null> {
+  const ids = await getClerkUserIdentifiers(userId);
+  return ids.email;
+}
+
+/**
+ * Retrieves the primary email address and phone number of a signed-in Clerk user.
+ */
+export async function getClerkUserIdentifiers(userId: string): Promise<{ email: string | null; phone: string | null }> {
   try {
     const clerk = getClerkClient();
     const user = await clerk.users.getUser(userId);
@@ -44,9 +52,17 @@ export async function getClerkUserPrimaryEmail(userId: string): Promise<string |
     const emailObj =
       user.emailAddresses.find((e) => e.id === primaryEmailId) ||
       user.emailAddresses[0];
-    return emailObj?.emailAddress ?? null;
+    const primaryPhoneId = user.primaryPhoneNumberId;
+    const phoneObj =
+      user.phoneNumbers.find((p) => p.id === primaryPhoneId) ||
+      user.phoneNumbers[0];
+    return {
+      email: emailObj?.emailAddress ?? null,
+      phone: phoneObj?.phoneNumber ?? null,
+    };
   } catch (err: any) {
-    console.warn(`Unable to fetch Clerk user email for ${userId}:`, err?.message || err);
-    return null;
+    console.warn(`Unable to fetch Clerk user identifiers for ${userId}:`, err?.message || err);
+    return { email: null, phone: null };
   }
 }
+

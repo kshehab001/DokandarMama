@@ -12,7 +12,7 @@ import {
 } from "@workspace/db";
 import { getUserId } from "./auth";
 import { RouteError } from "./numeric";
-import { getClerkUserPrimaryEmail } from "./clerk";
+import { getClerkUserPrimaryEmail, getClerkUserIdentifiers } from "./clerk";
 
 export interface ShopContext {
   shopId: number;
@@ -61,44 +61,57 @@ export async function resolveShopContext(
       ),
     );
 
-  // Auto-claim pending email invitations upon user authentication
+  // Auto-claim pending invitations upon user authentication (matching email or phone)
   if (memberships.length === 0) {
-    const userEmail = await getClerkUserPrimaryEmail(userId);
-    if (userEmail) {
-      const [pendingInv] = await db
-        .select()
-        .from(shopUsersTable)
-        .where(
-          and(
-            sql`LOWER(${shopUsersTable.email}) = LOWER(${userEmail})`,
-            eq(shopUsersTable.status, "pending"),
-          ),
-        );
+    const { email: userEmail, phone: userPhone } = await getClerkUserIdentifiers(userId);
+    if (userEmail || userPhone) {
+      const matchConditions = [];
+      if (userEmail) {
+        matchConditions.push(sql`LOWER(${shopUsersTable.email}) = LOWER(${userEmail})`);
+      }
+      if (userPhone) {
+        matchConditions.push(sql`${shopUsersTable.email} = ${userPhone}`);
+        matchConditions.push(sql`${shopUsersTable.name} LIKE ${`%${userPhone.slice(-6)}%`}`);
+      }
 
-      if (pendingInv) {
-        await db
-          .update(shopUsersTable)
-          .set({
-            userId,
-            status: "active",
-            updatedAt: new Date(),
-          })
-          .where(eq(shopUsersTable.id, pendingInv.id));
-
-        memberships = await db
-          .select({
-            shopId: shopUsersTable.shopId,
-            role: shopUsersTable.role,
-            organizationId: shopsTable.organizationId,
-          })
+      if (matchConditions.length > 0) {
+        const pendingInvs = await db
+          .select()
           .from(shopUsersTable)
-          .innerJoin(shopsTable, eq(shopsTable.id, shopUsersTable.shopId))
           .where(
             and(
-              eq(shopUsersTable.userId, userId),
-              ne(shopUsersTable.status, "revoked"),
+              matchConditions.length === 1 ? matchConditions[0] : sql`(${matchConditions[0]} OR ${matchConditions[1]})`,
+              eq(shopUsersTable.status, "pending"),
             ),
           );
+
+        for (const pendingInv of pendingInvs) {
+          await db
+            .update(shopUsersTable)
+            .set({
+              userId,
+              status: "active",
+              updatedAt: new Date(),
+            })
+            .where(eq(shopUsersTable.id, pendingInv.id));
+        }
+
+        if (pendingInvs.length > 0) {
+          memberships = await db
+            .select({
+              shopId: shopUsersTable.shopId,
+              role: shopUsersTable.role,
+              organizationId: shopsTable.organizationId,
+            })
+            .from(shopUsersTable)
+            .innerJoin(shopsTable, eq(shopsTable.id, shopUsersTable.shopId))
+            .where(
+              and(
+                eq(shopUsersTable.userId, userId),
+                ne(shopUsersTable.status, "revoked"),
+              ),
+            );
+        }
       }
     }
   }

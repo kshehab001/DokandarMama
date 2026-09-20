@@ -72,11 +72,19 @@ function serializeShop(row: typeof shopsTable.$inferSelect) {
 /** Every shop the signed-in user is a member of, with their role in each. */
 router.get("/shops", async (req, res): Promise<void> => {
   const userId = getUserId(req);
+  // Auto-claim any pending invites for this user's email or phone first
+  await resolveShopContext(req);
+
   const rows = await db
     .select({ shop: shopsTable, role: shopUsersTable.role })
     .from(shopUsersTable)
     .innerJoin(shopsTable, eq(shopsTable.id, shopUsersTable.shopId))
-    .where(eq(shopUsersTable.userId, userId))
+    .where(
+      and(
+        eq(shopUsersTable.userId, userId),
+        ne(shopUsersTable.status, "revoked"),
+      ),
+    )
     .orderBy(shopsTable.id);
 
   res.json(rows.map((r) => ({ ...serializeShop(r.shop), role: r.role })));
@@ -415,7 +423,7 @@ router.post("/shops/join", async (req, res): Promise<void> => {
   const cleanNum = rawCode.replace(/[^0-9a-zA-Z]/g, "").toUpperCase();
   const strippedCode = cleanNum.replace(/^INV/, "");
 
-  // Check if code matches any pending member in shop_users
+  // Check if code matches any pending member in shop_users (by code, email, or user placeholder)
   const candidates = await db
     .select()
     .from(shopUsersTable)
@@ -424,7 +432,8 @@ router.post("/shops/join", async (req, res): Promise<void> => {
         or(
           sql`UPPER(${shopUsersTable.userId}) LIKE ${`%${strippedCode}%`}`,
           sql`UPPER(${shopUsersTable.userId}) = ${`INV_${rawCode.toUpperCase()}`}`,
-          sql`UPPER(${shopUsersTable.userId}) = ${rawCode.toUpperCase()}`
+          sql`UPPER(${shopUsersTable.userId}) = ${rawCode.toUpperCase()}`,
+          sql`LOWER(${shopUsersTable.email}) = ${rawCode.toLowerCase()}`
         ),
         eq(shopUsersTable.status, "pending"),
       ),
@@ -438,27 +447,57 @@ router.post("/shops/join", async (req, res): Promise<void> => {
     return;
   }
 
-  // Activate the user as member
-  const [activated] = await db
-    .update(shopUsersTable)
-    .set({
-      userId,
-      status: "active",
-      updatedAt: new Date(),
-    })
-    .where(eq(shopUsersTable.id, matched.id))
-    .returning();
+  // Check if user is already a member of this shop to prevent unique constraint conflicts
+  const existingMembership = await db
+    .select()
+    .from(shopUsersTable)
+    .where(
+      and(
+        eq(shopUsersTable.shopId, matched.shopId),
+        eq(shopUsersTable.userId, userId),
+      ),
+    );
+
+  let targetShopId = matched.shopId;
+  let targetRole = matched.role;
+
+  if (existingMembership.length > 0) {
+    // User is already a member — update role and activate
+    await db
+      .update(shopUsersTable)
+      .set({
+        role: matched.role,
+        status: "active",
+        updatedAt: new Date(),
+      })
+      .where(eq(shopUsersTable.id, existingMembership[0].id));
+
+    // Remove the placeholder invite row
+    await db.delete(shopUsersTable).where(eq(shopUsersTable.id, matched.id));
+    targetShopId = existingMembership[0].shopId;
+    targetRole = matched.role;
+  } else {
+    // Activate the invited user as member
+    await db
+      .update(shopUsersTable)
+      .set({
+        userId,
+        status: "active",
+        updatedAt: new Date(),
+      })
+      .where(eq(shopUsersTable.id, matched.id));
+  }
 
   const [shop] = await db
     .select()
     .from(shopsTable)
-    .where(eq(shopsTable.id, activated.shopId));
+    .where(eq(shopsTable.id, targetShopId));
 
   res.json({
     success: true,
     shop: serializeShop(shop),
-    role: activated.role,
-    message: `সফলভাবে ${shop?.name || "দোকানে"} ${activated.role === "manager" ? "ম্যানেজার" : "দোকানদার"} হিসেবে যুক্ত হয়েছেন!`,
+    role: targetRole,
+    message: `সফলভাবে ${shop?.name || "দোকানে"} ${targetRole === "manager" ? "ম্যানেজার" : "দোকানদার"} হিসেবে যুক্ত হয়েছেন!`,
   });
 });
 

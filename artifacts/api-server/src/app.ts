@@ -135,8 +135,8 @@ if (staticDir) {
     // Serve static files (assets, images, scripts) without serving raw index.html for "/"
     app.use(express.static(resolvedDir, { index: false }));
 
-    // Serve index.html for root and all SPA client-side routes (excluding /api, /health, /diagnostics)
-    app.get(["/", "/index.html", "/app", "/app/*", "/sign-in", "/sign-in/*", "/sign-up", "/sign-up/*", "/admin", "/admin/*"], (_req, res) => {
+    // Serve index.html for root; all other SPA routes fall through to the SPA fallback below
+    app.get("/", (_req, res) => {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       const html = getInjectedIndexHtml(indexHtmlPath);
       res.send(html);
