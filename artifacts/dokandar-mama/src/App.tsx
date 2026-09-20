@@ -79,10 +79,10 @@ const rawClerkKey =
 let clerkPubKey = rawClerkKey;
 if (rawClerkKey) {
   try {
-    const hostKey =
-      typeof window !== 'undefined' && window.location?.hostname
-        ? publishableKeyFromHost(window.location.hostname, rawClerkKey)
-        : null;
+    const hostname = typeof window !== 'undefined' ? window.location?.hostname : '';
+    const isLocal = !hostname || hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.local');
+    const isNative = typeof window !== 'undefined' && Boolean((window as any).Capacitor?.isNativePlatform?.());
+    const hostKey = (!isLocal && !isNative) ? publishableKeyFromHost(hostname, rawClerkKey) : null;
     clerkPubKey = hostKey || rawClerkKey;
   } catch {
     clerkPubKey = rawClerkKey;

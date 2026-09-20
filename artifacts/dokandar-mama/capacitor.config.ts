@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Dokandar Mama',
   webDir: 'dist/public',
   server: {
-    androidScheme: 'https',
+    url: 'https://dokandar-mama.onrender.com',
     cleartext: true,
   },
   plugins: {
