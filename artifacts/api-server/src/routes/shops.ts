@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   SHOP_CATEGORIES,
@@ -46,12 +46,12 @@ const UpdateShopBody = z.object({
 const AddMemberBody = z
   .object({
     userId: z.string().trim().max(120).optional(),
-    email: z.string().trim().email().optional(),
+    email: z.string().trim().email().optional().or(z.literal("")),
     name: z.string().trim().max(120).optional(),
     role: z.enum(SHOP_ROLES),
   })
-  .refine((d) => d.userId || d.email, {
-    message: "User ID অথবা Email দিতে হবে",
+  .refine((d) => d.userId || (d.email && d.email.length > 0) || d.name, {
+    message: "কর্মীর নাম, ইমেইল অথবা ইউজার আইডি দিতে হবে",
   });
 
 function serializeShop(row: typeof shopsTable.$inferSelect) {
@@ -255,17 +255,39 @@ router.get("/shops/current/members", async (req, res): Promise<void> => {
     .where(eq(shopUsersTable.shopId, ctx.shopId))
     .orderBy(shopUsersTable.id);
 
+  const rawOrigin = req.header("origin") || req.header("referer");
+  let origin = rawOrigin ? new URL(rawOrigin).origin : null;
+  if (!origin || origin.includes("localhost") || origin.includes("capacitor://")) {
+    origin = process.env.PUBLIC_APP_URL || process.env.APP_URL || "https://dokandar-mama.onrender.com";
+  }
+
   res.json(
-    rows.map((r) => ({
-      id: r.id,
-      userId: r.userId,
-      email: r.email,
-      name: r.name,
-      role: r.role,
-      status: r.status,
-      invitedBy: r.invitedBy,
-      createdAt: r.createdAt.toISOString(),
-    })),
+    rows.map((r) => {
+      let inviteCode: string | null = null;
+      if (r.status === "pending") {
+        if (r.userId.startsWith("inv_")) {
+          inviteCode = r.userId.replace("inv_", "");
+        } else if (r.userId.startsWith("clerk_inv_")) {
+          inviteCode = `INV-${r.userId.slice(-6).toUpperCase()}`;
+        } else if (r.userId.startsWith("invited_")) {
+          inviteCode = `INV-${r.userId.slice(-6).toUpperCase()}`;
+        } else {
+          inviteCode = `INV-${String(r.id).padStart(4, "0")}`;
+        }
+      }
+      return {
+        id: r.id,
+        userId: r.userId,
+        email: r.email,
+        name: r.name,
+        role: r.role,
+        status: r.status,
+        inviteCode,
+        joinUrl: inviteCode ? `${origin.replace(/\/$/, "")}/app?invite=${encodeURIComponent(inviteCode)}` : null,
+        invitedBy: r.invitedBy,
+        createdAt: r.createdAt.toISOString(),
+      };
+    }),
   );
 });
 
@@ -283,37 +305,37 @@ router.post("/shops/current/members", async (req, res): Promise<void> => {
 
   await assertCanAddMember(ctx.shopId);
 
-  let clerkInvitationId: string | null = null;
-  if (parsed.data.email) {
-    const rawOrigin = req.header("origin") || req.header("referer");
-    let origin = rawOrigin ? new URL(rawOrigin).origin : null;
-    if (!origin) {
-      origin = process.env.PUBLIC_APP_URL || process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
-    }
-    const redirectUrl = `${origin.replace(/\/$/, "")}/sign-up`;
+  // Generate a clean 6-digit invite code (e.g. INV-849201)
+  const rawCode = `INV-${Math.floor(100000 + Math.random() * 900000)}`;
 
+  const rawOrigin = req.header("origin") || req.header("referer");
+  let origin = rawOrigin ? new URL(rawOrigin).origin : null;
+  // Never pass localhost/capacitor scheme to Clerk
+  if (!origin || origin.includes("localhost") || origin.includes("capacitor://")) {
+    origin = process.env.PUBLIC_APP_URL || process.env.APP_URL || "https://dokandar-mama.onrender.com";
+  }
+  // Embed invite code in the redirect so the employee lands on /app?invite=INV-XXXXXX
+  // after completing Clerk sign-up — the ShopOnboardingGate auto-detects this URL param.
+  const joinUrl = `${origin.replace(/\/$/, "")}/app?invite=${encodeURIComponent(rawCode)}`;
+  const redirectUrl = `${origin.replace(/\/$/, "")}/sign-up?redirect_url=${encodeURIComponent(joinUrl)}`;
+
+  let clerkInvitationId: string | null = null;
+  if (parsed.data.email && parsed.data.email.trim().length > 0) {
     try {
       const inv = await sendClerkInvitation({
-        emailAddress: parsed.data.email,
+        emailAddress: parsed.data.email.trim(),
         redirectUrl,
         shopId: ctx.shopId,
         role: parsed.data.role,
       });
       clerkInvitationId = inv.id;
     } catch (err: any) {
-      console.error("Failed to dispatch Clerk invitation email:", err?.message || err);
-      throw new RouteError(
-        400,
-        `ইনভাইটেশন ইমেইল পাঠানো সম্ভব হয়নি: ${err?.message || "ইনভাইটেশন সার্ভিস সমস্যা"}`,
-      );
+      console.warn("Notice: Clerk email delivery issue (invite code remains valid):", err?.message || err);
+      // Non-fatal: Employee can still join with the invite code directly!
     }
   }
 
-  const memberUserId =
-    parsed.data.userId ||
-    (clerkInvitationId
-      ? `clerk_inv_${clerkInvitationId}`
-      : `invited_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
+  const memberUserId = parsed.data.userId || `inv_${rawCode}`;
   const status = parsed.data.userId ? "active" : "pending";
 
   const [row] = await db
@@ -321,8 +343,8 @@ router.post("/shops/current/members", async (req, res): Promise<void> => {
     .values({
       shopId: ctx.shopId,
       userId: memberUserId,
-      email: parsed.data.email ?? null,
-      name: parsed.data.name ?? null,
+      email: parsed.data.email?.trim() || null,
+      name: parsed.data.name?.trim() || null,
       role: parsed.data.role,
       status,
       invitedBy: ctx.userId,
@@ -331,8 +353,8 @@ router.post("/shops/current/members", async (req, res): Promise<void> => {
       target: [shopUsersTable.shopId, shopUsersTable.userId],
       set: {
         role: parsed.data.role,
-        name: parsed.data.name ?? null,
-        email: parsed.data.email ?? null,
+        name: parsed.data.name?.trim() || null,
+        email: parsed.data.email?.trim() || null,
         status,
       },
     })
@@ -345,6 +367,8 @@ router.post("/shops/current/members", async (req, res): Promise<void> => {
     name: row.name,
     role: row.role,
     status: row.status,
+    inviteCode: status === "pending" ? rawCode : null,
+    joinUrl: status === "pending" ? joinUrl : null,
   });
 });
 
@@ -369,8 +393,73 @@ router.delete("/shops/current/members/:id", async (req, res): Promise<void> => {
     throw new RouteError(400, "নিজেকে সরানো যাবে না");
   }
 
-  await db.delete(shopUsersTable).where(eq(shopUsersTable.id, id));
-  res.sendStatus(204);
+  await db
+    .delete(shopUsersTable)
+    .where(and(eq(shopUsersTable.id, id), eq(shopUsersTable.shopId, ctx.shopId)));
+
+  res.status(204).end();
+});
+
+/**
+ * Allows a signed-in user (employee / shopkeeper / manager) to join a shop
+ * using an Invite Code (e.g. "INV-849201" or numeric "849201").
+ */
+router.post("/shops/join", async (req, res): Promise<void> => {
+  const userId = getUserId(req);
+  const rawCode = String(req.body?.inviteCode || req.body?.code || "").trim();
+  if (!rawCode) {
+    res.status(400).json({ error: "ইনভাইট কোড আবশ্যক" });
+    return;
+  }
+
+  const cleanNum = rawCode.replace(/[^0-9a-zA-Z]/g, "").toUpperCase();
+  const strippedCode = cleanNum.replace(/^INV/, "");
+
+  // Check if code matches any pending member in shop_users
+  const candidates = await db
+    .select()
+    .from(shopUsersTable)
+    .where(
+      and(
+        or(
+          sql`UPPER(${shopUsersTable.userId}) LIKE ${`%${strippedCode}%`}`,
+          sql`UPPER(${shopUsersTable.userId}) = ${`INV_${rawCode.toUpperCase()}`}`,
+          sql`UPPER(${shopUsersTable.userId}) = ${rawCode.toUpperCase()}`
+        ),
+        eq(shopUsersTable.status, "pending"),
+      ),
+    );
+
+  const matched = candidates[0];
+  if (!matched) {
+    res.status(404).json({
+      error: "ইনভাইট কোডটি সঠিক নয় বা ইতিমধ্যে ব্যবহৃত হয়েছে। দোকানের মালিকের সাথে যোগাযোগ করুন।",
+    });
+    return;
+  }
+
+  // Activate the user as member
+  const [activated] = await db
+    .update(shopUsersTable)
+    .set({
+      userId,
+      status: "active",
+      updatedAt: new Date(),
+    })
+    .where(eq(shopUsersTable.id, matched.id))
+    .returning();
+
+  const [shop] = await db
+    .select()
+    .from(shopsTable)
+    .where(eq(shopsTable.id, activated.shopId));
+
+  res.json({
+    success: true,
+    shop: serializeShop(shop),
+    role: activated.role,
+    message: `সফলভাবে ${shop?.name || "দোকানে"} ${activated.role === "manager" ? "ম্যানেজার" : "দোকানদার"} হিসেবে যুক্ত হয়েছেন!`,
+  });
 });
 
 /** Convenience: who am I, in this shop? Used to gate UI affordances. */

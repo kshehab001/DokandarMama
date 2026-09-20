@@ -43,6 +43,9 @@ import {
   Clock,
   Briefcase,
   Layers,
+  Copy,
+  Share2,
+  KeyRound,
 } from "lucide-react"
 
 const ALL_PAYMENT_METHODS = [
@@ -176,6 +179,8 @@ export function ManagementPage() {
       name: string | null
       role: "admin" | "manager" | "shopkeeper"
       status?: "active" | "pending" | "revoked" | "expired"
+      inviteCode?: string | null
+      joinUrl?: string | null
       invitedBy?: string | null
       createdAt: string
     }>
@@ -200,6 +205,11 @@ export function ManagementPage() {
   const [newMemberUserId, setNewMemberUserId] = useState("")
   const [newMemberRole, setNewMemberRole] = useState<"manager" | "shopkeeper">("shopkeeper")
   const [isAddingMember, setIsAddingMember] = useState(false)
+  const [newlyCreatedMember, setNewlyCreatedMember] = useState<{
+    name: string
+    code: string
+    joinUrl?: string | null
+  } | null>(null)
 
   const togglePaymentMethod = (methodId: string) => {
     setEnabledMethods((prev) => {
@@ -287,10 +297,6 @@ export function ManagementPage() {
       toast({ title: language === "en" ? "Enter staff name" : "কর্মচারীর নাম লিখুন", variant: "destructive" })
       return
     }
-    if (!newMemberUserId.trim() && !newMemberEmail.trim()) {
-      toast({ title: language === "en" ? "Provide email or User ID" : "ইমেইল অথবা ইউজার আইডি লিখুন", variant: "destructive" })
-      return
-    }
 
     setIsAddingMember(true)
     try {
@@ -313,11 +319,20 @@ export function ManagementPage() {
         throw new Error(errData.error || "কর্মী যোগ করা যায়নি")
       }
 
+      const created = await res.json()
       queryClient.invalidateQueries({ queryKey: ["shop-members", activeShop?.id] })
       setNewMemberName("")
       setNewMemberUserId("")
       setNewMemberEmail("")
-      toast({ title: `✓ ${language === "en" ? "Invitation sent" : "ইনভাইট পাঠানো হয়েছে"}` })
+
+      if (created.inviteCode) {
+        setNewlyCreatedMember({
+          name: created.name || "নতুন কর্মী",
+          code: created.inviteCode,
+          joinUrl: created.joinUrl,
+        })
+      }
+      toast({ title: `✓ ${language === "en" ? "Staff added & Invite Code generated" : "কর্মী যুক্ত হয়েছে এবং ইনভাইট কোড তৈরি হয়েছে"}` })
     } catch (err: any) {
       toast({ title: err.message || "কর্মী যুক্ত করতে সমস্যা হয়েছে", variant: "destructive" })
     } finally {
@@ -761,21 +776,22 @@ export function ManagementPage() {
                     />
                   </div>
                   <div>
-                    <Label className="text-xs font-semibold">ইমেইল (ইনভাইটেশন)</Label>
+                    <Label className="text-xs font-semibold">ইমেইল (অপশনাল)</Label>
                     <Input
                       type="email"
                       value={newMemberEmail}
                       onChange={(e) => setNewMemberEmail(e.target.value)}
-                      placeholder="staff@example.com"
+                      placeholder="staff@example.com (ঐচ্ছিক)"
                       className="h-10 rounded-xl mt-1 bg-background text-xs"
                     />
+                    <p className="text-[10px] text-muted-foreground mt-0.5">ইমেইল না থাকলেও কোড দিয়ে যুক্ত হতে পারবে</p>
                   </div>
                   <div>
                     <Label className="text-xs font-semibold">ইউজার আইডি (অপশনাল)</Label>
                     <Input
                       value={newMemberUserId}
                       onChange={(e) => setNewMemberUserId(e.target.value)}
-                      placeholder="user_..."
+                      placeholder="user_... (ঐচ্ছিক)"
                       className="h-10 rounded-xl mt-1 bg-background font-mono text-xs"
                     />
                   </div>
@@ -794,10 +810,67 @@ export function ManagementPage() {
                 <div className="flex justify-end">
                   <Button type="submit" size="sm" disabled={isAddingMember} className="rounded-xl font-bold gap-1.5 h-9">
                     <Plus className="h-4 w-4" />
-                    {isAddingMember ? "যোগ হচ্ছে..." : "ইনভাইট পাঠান / টিমে যোগ করুন"}
+                    {isAddingMember ? "যোগ হচ্ছে..." : "কর্মী যোগ করুন ও কোড পান"}
                   </Button>
                 </div>
               </form>
+            )}
+
+            {/* Newly Created Member Banner with Invite Code */}
+            {newlyCreatedMember && (
+              <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-3 animate-in fade-in">
+                <div className="flex items-center justify-between">
+                  <div className="font-bold text-sm text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span>{newlyCreatedMember.name} সফলভাবে যুক্ত হয়েছেন!</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => setNewlyCreatedMember(null)}
+                  >
+                    ✕ বন্ধ করুন
+                  </Button>
+                </div>
+                <div className="bg-card p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs text-muted-foreground">কর্মীর জন্য ইনভাইটেশন কোড:</div>
+                    <div className="text-lg font-mono font-bold text-primary tracking-wider">
+                      {newlyCreatedMember.code}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="rounded-xl h-8 text-xs font-bold gap-1"
+                      onClick={() => {
+                        navigator.clipboard.writeText(newlyCreatedMember.code)
+                        toast({ title: "✓ ইনভাইট কোড কপি করা হয়েছে" })
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                      কোড কপি
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="rounded-xl h-8 text-xs font-bold gap-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={() => {
+                        const joinLink = newlyCreatedMember.joinUrl || `${window.location.origin}/app?invite=${encodeURIComponent(newlyCreatedMember.code)}`
+                        const msg = encodeURIComponent(`দোকানদার মামা অ্যাপে ${activeShop?.name || "দোকানে"} কর্মী হিসেবে যোগ দিন।\nআপনার ইনভাইট কোড: ${newlyCreatedMember.code}\nঅ্যাপ লিংক: ${joinLink}`)
+                        window.open(`https://wa.me/?text=${msg}`, "_blank")
+                      }}
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                      WhatsApp এ পাঠান
+                    </Button>
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* Members List */}
@@ -835,10 +908,11 @@ export function ManagementPage() {
               ) : (
                 staffMembers.map((m: any) => {
                   const status = m.status || "active"
+                  const displayCode = m.inviteCode || (status === "pending" && m.userId.startsWith("inv_") ? m.userId.replace("inv_", "") : null)
                   return (
                     <div
                       key={m.id}
-                      className="p-3.5 rounded-2xl bg-card border border-border flex items-center justify-between"
+                      className="p-3.5 rounded-2xl bg-card border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                     >
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-xl bg-muted text-foreground flex items-center justify-center font-bold text-sm">
@@ -848,7 +922,7 @@ export function ManagementPage() {
                           <div className="font-bold text-sm text-foreground flex items-center gap-2">
                             <span>{m.name || "অজ্ঞাত কর্মী"}</span>
                             <Badge variant="outline" className="text-[10px]">
-                              {m.role === "manager" ? "ম্যানেজার" : "বিক্রেতা"}
+                              {m.role === "manager" ? "ম্যানেজার" : "দোকানদার"}
                             </Badge>
                             <Badge
                               className={`text-[10px] ${
@@ -862,21 +936,57 @@ export function ManagementPage() {
                               {status === "active" ? "সক্রিয় (Active)" : status === "pending" ? "অপেক্ষমান (Pending)" : "বাতিল (Revoked)"}
                             </Badge>
                           </div>
-                          <div className="text-xs text-muted-foreground font-mono">
+                          <div className="text-xs text-muted-foreground font-mono mt-0.5">
                             {m.email ? m.email : m.userId}
                           </div>
+
+                          {/* Pending Invite Code & Share Actions */}
+                          {status === "pending" && displayCode && (
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <span className="text-[11px] font-mono bg-muted px-2 py-0.5 rounded font-bold text-primary">
+                                কোড: {displayCode}
+                              </span>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-2 text-[10px] font-bold text-primary hover:bg-primary/10 gap-1 rounded"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(displayCode)
+                                  toast({ title: "কোড কপি করা হয়েছে" })
+                                }}
+                              >
+                                <Copy className="h-3 w-3" /> কোড কপি
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-2 text-[10px] font-bold text-emerald-600 hover:bg-emerald-50 gap-1 rounded"
+                                onClick={() => {
+                                  const link = m.joinUrl || `${window.location.origin}/app?invite=${encodeURIComponent(displayCode)}`
+                                  const msg = encodeURIComponent(`দোকানদার মামা অ্যাপে ${activeShop?.name || "দোকানে"} কর্মী হিসেবে যোগ দিন।\nইনভাইট কোড: ${displayCode}\nলিংক: ${link}`)
+                                  window.open(`https://wa.me/?text=${msg}`, "_blank")
+                                }}
+                              >
+                                <Share2 className="h-3 w-3" /> WhatsApp
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                       {isOwner && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-lg"
-                          onClick={() => handleRemoveMember(m.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-lg"
+                            onClick={() => handleRemoveMember(m.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )

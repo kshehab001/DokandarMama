@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { and, eq, isNull, ne } from "drizzle-orm";
+import { and, eq, isNull, ne, sql } from "drizzle-orm";
 import {
   customersTable,
   db,
@@ -70,7 +70,7 @@ export async function resolveShopContext(
         .from(shopUsersTable)
         .where(
           and(
-            eq(shopUsersTable.email, userEmail),
+            sql`LOWER(${shopUsersTable.email}) = LOWER(${userEmail})`,
             eq(shopUsersTable.status, "pending"),
           ),
         );
