@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, eq, ne, or, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import {
   SHOP_CATEGORIES,
