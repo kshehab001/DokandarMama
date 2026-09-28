@@ -10,11 +10,6 @@
 ## You only need to fill in the Clerk keys (marked sync: false below) —
 ## Render prompts for these during blueprint setup.
 
-databases:
-  - name: dokandar-mama-db
-    plan: free
-    postgresMajorVersion: "16"
-
 services:
   - type: web
     name: dokandar-mama
@@ -39,10 +34,11 @@ services:
       # same process/URL — this is what makes it a single one-click service.
       - key: SERVE_STATIC_DIR
         value: artifacts/dokandar-mama/dist/public
+      # Set this manually in the Render dashboard → Environment tab
+      # to your new database's Internal Database URL:
+      # postgresql://dokandar_mama_new_database_user:...@dpg-dat3h50473hc73ejdcn0-a/dokandar_mama_new_database
       - key: DATABASE_URL
-        fromDatabase:
-          name: dokandar-mama-db
-          property: connectionString
+        sync: false
       - key: CLERK_SECRET_KEY
         sync: false
       - key: CLERK_PUBLISHABLE_KEY
