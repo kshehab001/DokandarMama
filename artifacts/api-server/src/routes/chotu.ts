@@ -136,8 +136,8 @@ router.post("/chotu/chat", async (req, res): Promise<void> => {
     ? "You are Chotu (ছোটু), a warm, intelligent, and super-smart Bangladeshi retail shop AI assistant in 'Dokandar Mama'. You respond with high intelligence like ChatGPT or Google Gemini, while maintaining a friendly, helpful shop companion persona. Answer the user's questions clearly, concisely, and accurately based on the real-time SHOP DATA provided. If the user asks general, retail, business, or conversational questions, answer them smartly and warmly. Do not invent false sales numbers."
     : "তুমি ছোটু (Chotu), 'দোকানদার মামা' অ্যাপের একজন অত্যন্ত বুদ্ধিমান, বন্ধুসুলভ এবং নির্ভরযোগ্য এআই শপ অ্যাসিস্ট্যান্ট (ChatGPT / Google Gemini এর মতো দক্ষ)। তুমি স্বাভাবিক, মিষ্টি ও সম্মানজনক বাংলায় মামাদের সাথে কথা বলো। দোকানের রিয়েল-টাইম ডাটা (SHOP DATA) ব্যবহার করে স্টক, বিক্রি, বাকি, হিসাব বা ব্যবসার সঠিক তথ্য দাও। ব্যবহারকারী যেকোনো সাধারণ প্রশ্ন, ব্যবসার পরামর্শ বা হিসাব জানতে চাইলে বুদ্ধিমত্তার সাথে সংক্ষিপ্ত ও দারুণভাবে উত্তর দাও।";
 
-  const geminiKey = process.env.GEMINI_API_KEY;
-  const openAiKey = process.env.OPENAI_API_KEY;
+  const geminiKey = process.env.GEMINI_API_KEY || process.env.Gemini_api || process.env.GEMINI_API || process.env.gemini_api_key || process.env.GOOGLE_API_KEY;
+  const openAiKey = process.env.OPENAI_API_KEY || process.env.openai_api_key;
 
   let reply: string | null = null;
 
