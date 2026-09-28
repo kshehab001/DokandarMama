@@ -135,7 +135,27 @@ router.post("/shops", async (req, res): Promise<void> => {
   const userId = getUserId(req);
   const { name, category, ownerName, area, organizationName } = parsed.data;
 
-  const isFirstShop = (await resolveShopContext(req)) === null;
+  const existingCtx = await resolveShopContext(req);
+  if (existingCtx && !organizationName) {
+    // If the user already has a shop, update the existing shop instead of throwing 403
+    const [updated] = await db
+      .update(shopsTable)
+      .set({
+        name,
+        category,
+        ownerName: ownerName ?? null,
+        ...(area ? { area } : {}),
+      })
+      .where(eq(shopsTable.id, existingCtx.shopId))
+      .returning();
+
+    if (updated) {
+      res.status(200).json(serializeShop(updated));
+      return;
+    }
+  }
+
+  const isFirstShop = existingCtx === null;
   if (!isFirstShop) {
     await assertCanCreateShop(userId);
   }

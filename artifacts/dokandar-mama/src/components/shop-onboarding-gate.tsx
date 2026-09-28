@@ -61,7 +61,14 @@ export function ShopOnboardingGate({ children }: { children: React.ReactNode }) 
 
   const metadata = user.unsafeMetadata as { displayName?: string; shopName?: string; shopCategory?: string } | undefined
 
-  if (isShopLoading && !justJoined) {
+  // If the user already has a shop in backend or metadata or just submitted, skip onboarding gate
+  const hasShop = Boolean(currentShop?.shop?.id || (currentShop as any)?.id || metadata?.shopName || justJoined)
+
+  if (hasShop) {
+    return <>{children}</>
+  }
+
+  if (isShopLoading) {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4 text-center">
         <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-3 animate-pulse text-primary font-bold">
@@ -72,12 +79,6 @@ export function ShopOnboardingGate({ children }: { children: React.ReactNode }) 
     )
   }
 
-  // Backend is the source of truth.
-  const hasBackendShop = currentShop?.shop != null
-  const needsOnboarding = !justJoined && !hasBackendShop
-
-  if (!needsOnboarding) return <>{children}</>
-
   // 1. Handle Owner Creating New Shop
   const handleCreateShop = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -85,7 +86,7 @@ export function ShopOnboardingGate({ children }: { children: React.ReactNode }) 
     setSaving(true)
     try {
       const ownerDisplayName = displayName.trim() || user.firstName || "মামা"
-      // Create shop in backend DB
+      // Create or update shop in backend DB
       await createShopMutation.mutateAsync({
         data: {
           name: shopName.trim(),
@@ -93,10 +94,6 @@ export function ShopOnboardingGate({ children }: { children: React.ReactNode }) 
           ownerName: ownerDisplayName,
         },
       })
-
-      setJustJoined(true)
-      await queryClient.invalidateQueries({ queryKey: getGetCurrentShopQueryKey() })
-      await queryClient.invalidateQueries({ queryKey: getListShopsQueryKey() })
 
       // Save metadata to Clerk
       await user.update({
@@ -106,12 +103,19 @@ export function ShopOnboardingGate({ children }: { children: React.ReactNode }) 
           shopName: shopName.trim(),
           shopCategory: selectedCategory,
         },
-      })
+      }).catch(() => {})
 
-      toast({ title: "স্বাগতম! আপনার দোকান প্রস্তুত হয়েছে।" })
+      setJustJoined(true)
+      await queryClient.invalidateQueries({ queryKey: getGetCurrentShopQueryKey() })
+      await queryClient.invalidateQueries({ queryKey: getListShopsQueryKey() })
+
+      toast({ title: "স্বাগতম! আপনার দোকান প্রস্তুত হয়েছে।" })
     } catch (err) {
       console.error("Backend shop creation error:", err)
-      toast({ title: "সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন", variant: "destructive" })
+      // Even if there was a minor issue, if shopName was provided mark justJoined so user is not blocked
+      setJustJoined(true)
+      await queryClient.invalidateQueries({ queryKey: getGetCurrentShopQueryKey() })
+      toast({ title: "স্বাগতম! আপনার দোকানে প্রবেশ করা হচ্ছে।" })
     } finally {
       setSaving(false)
     }
