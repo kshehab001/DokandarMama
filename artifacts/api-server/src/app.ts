@@ -175,7 +175,8 @@ app.use(
       return;
     }
     logger.error({ err }, "Unhandled API error");
-    res.status(500).json({ error: "Internal server error" });
+    const errMsg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: "Internal server error", message: errMsg });
   },
 );
 
