@@ -1,15 +1,9 @@
 /**
  * ChouFloatingWidget
  *
- * The single, persistent Chotu widget mounted ONCE at the app root.
- * It is draggable, minimizable, and carries page-contextual poses,
- * quick actions, speech bubbles, and the existing voice/NLP engine.
- *
- * PERFORMANCE RULES (hard):
- * - Only transform/opacity are animated. No width/height/top/left.
- * - Drag uses pointer capture + requestAnimationFrame.
- * - All poses are pure SVG/CSS — zero image loads per page change.
- * - Respects prefers-reduced-motion.
+ * The single, persistent Chotu genie widget mounted ONCE at the app root.
+ * Fully draggable anywhere across the screen, minimizable, and carries
+ * page-contextual poses, quick actions, speech bubbles, and voice engine.
  */
 import {
   useState,
@@ -18,7 +12,7 @@ import {
   useEffect,
   useMemo,
 } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, type PanInfo } from "framer-motion"
 import { useLocation } from "wouter"
 import { useUser } from "@clerk/react"
 import {
@@ -96,24 +90,29 @@ function quickActionsForRoute(pathname: string): QuickAction[] {
 }
 
 // ---------------------------------------------------------------------------
-// Contextual speech bubble copy per pose/mood
+// Contextual speech bubble copy per route & mood
 // ---------------------------------------------------------------------------
-function contextBubble(pose: ChouPose, mood: ChouMood, name: string): string | null {
-  const map: Partial<Record<ChouPose, string>> = {
-    billing: mood === "excited"
+function contextBubbleForRoute(pathname: string, mood: ChouMood, name: string): string | null {
+  if (pathname.includes("/billing")) {
+    return mood === "excited"
       ? `বাহ্ ${name}! বিক্রি ভালোই চলছে আজ! 🎉`
-      : "পণ্য স্ক্যান করুন বা নাম লিখুন — বিল রেডি হয়ে যাবে!",
-    sale_done: `দারুণ! বিল সফল হয়েছে ${name}! আরও আসুক! 💰`,
-    inventory: mood === "concerned"
-      ? "কিছু পণ্যের স্টক কম হয়ে গেছে মামা! দেখে নিন।"
-      : "সব স্টক ঠিকঠাক আছে মামা! দোকান সাজানো আছে। 🧹",
-    low_stock: "মামা! এই পণ্যগুলো কম হয়ে গেছে — আজই অর্ডার দিন!",
-    baki: "বাকি খাতা হালনাগাদ রাখুন মামা। পাওনা টাকা মনে রাখা জরুরি!",
-    cashbox: "আজকের ক্যাশ মিলিয়ে দেখুন — সব ঠিক থাকলে বন্ধ করুন।",
-    reports: "আজকের বিক্রির পুরো চিত্র এখানে আছে মামা! দেখুন।",
-    offline: "নেট নেই — চিন্তা নেই! বিক্রি চলবে, নেট আসলে সিঙ্ক হবে।",
+      : "পণ্য স্ক্যান করুন বা নাম লিখুন — বিল রেডি হয়ে যাবে! ⚡"
   }
-  return map[pose] ?? null
+  if (pathname.includes("/inventory")) {
+    return mood === "concerned"
+      ? "কিছু পণ্যের স্টক কম হয়ে গেছে মামা! দেখে নিন।"
+      : "সব স্টক ঠিকঠাক আছে মামা! দোকান সাজানো আছে। 🧹"
+  }
+  if (pathname.includes("/customers")) {
+    return "বাকি খাতা হালনাগাদ রাখুন মামা। পাওনা টাকা মনে রাখা জরুরি! 📒"
+  }
+  if (pathname.includes("/cashbox")) {
+    return "আজকের ক্যাশ মিলিয়ে দেখুন — সব ঠিক থাকলে বন্ধ করুন। 💰"
+  }
+  if (pathname.includes("/reports")) {
+    return "আজকের বিক্রির পুরো চিত্র এখানে আছে মামা! দেখুন। 📊"
+  }
+  return `দোকানদার মামা রেডি ${name}! যেকোনো সাহায্য লাগলে ডাকুন। ✨`
 }
 
 // Map ChouPose → ChotuState for the existing avatar
@@ -125,7 +124,7 @@ function poseToAvatarState(pose: ChouPose, mood: ChouMood): ChotuState {
 }
 
 // ---------------------------------------------------------------------------
-// Pose emoji / prop overlay for the SVG (rendered atop the avatar)
+// Pose emoji / prop overlay for the badge (rendered atop the avatar)
 // ---------------------------------------------------------------------------
 const POSE_PROPS: Record<ChouPose, { emoji: string; label: string }> = {
   idle: { emoji: "✨", label: "" },
@@ -162,6 +161,41 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
 
   const { pendingCount } = useOfflineSync()
 
+  // Default coordinate computation based on viewport size
+  const getDefaultCoords = useCallback(() => {
+    if (typeof window === "undefined") return { x: 300, y: 500 }
+    const defaultX = Math.max(16, window.innerWidth - 90)
+    const defaultY = Math.max(16, window.innerHeight - 150)
+    return { x: defaultX, y: defaultY }
+  }, [])
+
+  // Local position state for 100% fluid dragging
+  const [coords, setCoords] = useState<{ x: number; y: number }>(() => {
+    if (position && (position.x > 0 || position.y > 0)) {
+      // Bounds check stored position against current window
+      if (typeof window !== "undefined") {
+        const clampedX = Math.max(12, Math.min(window.innerWidth - 88, position.x))
+        const clampedY = Math.max(12, Math.min(window.innerHeight - 110, position.y))
+        return { x: clampedX, y: clampedY }
+      }
+      return position
+    }
+    return getDefaultCoords()
+  })
+
+  // Keep coords clamped if window resizes
+  useEffect(() => {
+    const handleResize = () => {
+      setCoords((prev) => {
+        const clampedX = Math.max(12, Math.min(window.innerWidth - 88, prev.x))
+        const clampedY = Math.max(12, Math.min(window.innerHeight - 110, prev.y))
+        return { x: clampedX, y: clampedY }
+      })
+    }
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
+
   // Check for low stock on inventory page and upgrade pose
   const { data: products } = useListProducts()
   useEffect(() => {
@@ -177,104 +211,62 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
         )
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location, products])
 
-  // Contextual greeting on page enter (only for first 5s)
+  // Contextual greeting on page navigation
   const lastRouteRef = useRef(location)
   useEffect(() => {
     if (lastRouteRef.current === location) return
     lastRouteRef.current = location
-    const msg = contextBubble(pose, mood, displayName)
+    const msg = contextBubbleForRoute(location, mood, displayName)
     let t: ReturnType<typeof setTimeout> | undefined
     if (msg && !isMinimized) {
-      // Delay so it doesn't pop up mid-transition
-      t = setTimeout(() => speak(msg, 3500), 600)
+      t = setTimeout(() => speak(msg, 3500), 400)
     }
     return () => {
       if (t) clearTimeout(t)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location])
+  }, [location, mood, displayName, isMinimized, speak])
 
   // Quick-action menu
   const [menuOpen, setMenuOpen] = useState(false)
   const quickActions = useMemo(() => quickActionsForRoute(location), [location])
 
-  // Drag logic — pointer capture only, transform-only (no reflows)
-  const widgetRef = useRef<HTMLDivElement>(null)
-  const draggingRef = useRef(false)
-  const dragStart = useRef({ px: 0, py: 0, ox: 0, oy: 0 })
-  const rafRef = useRef<number | null>(null)
-  const tapThreshold = 8 // px moved = drag vs tap
-  const movedRef = useRef(false)
-
   const prefersReducedMotion =
     typeof window !== "undefined" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches
 
-  const onPointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      if (e.button !== 0 && e.pointerType === "mouse") return
-      draggingRef.current = true
-      movedRef.current = false
-      dragStart.current = { px: e.clientX, py: e.clientY, ox: position.x, oy: position.y }
-      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    },
-    [position]
-  )
+  // Drag tracking to distinguish click vs drag
+  const isDraggingRef = useRef(false)
+  const dragDistanceRef = useRef(0)
 
-  const onPointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!draggingRef.current) return
-      const dx = e.clientX - dragStart.current.px
-      const dy = e.clientY - dragStart.current.py
-      if (Math.abs(dx) > tapThreshold || Math.abs(dy) > tapThreshold) {
-        movedRef.current = true
-      }
-      if (!movedRef.current) return
-      const newX = Math.max(0, Math.min(window.innerWidth - 80, dragStart.current.ox + dx))
-      const newY = Math.max(0, Math.min(window.innerHeight - 120, dragStart.current.oy + dy))
+  const handleDragStart = () => {
+    isDraggingRef.current = true
+    dragDistanceRef.current = 0
+  }
 
-      if (rafRef.current) cancelAnimationFrame(rafRef.current)
-      rafRef.current = requestAnimationFrame(() => {
-        if (widgetRef.current) {
-          widgetRef.current.style.transform = `translate(${newX}px, ${newY}px)`
-        }
-      })
+  const handleDrag = (_: any, info: PanInfo) => {
+    dragDistanceRef.current = Math.hypot(info.offset.x, info.offset.y)
+  }
 
-      // Debounce persist
-      dragStart.current.ox = newX
-      dragStart.current.oy = newY
-    },
-    []
-  )
+  const handleDragEnd = (_: any, info: PanInfo) => {
+    setTimeout(() => {
+      isDraggingRef.current = false
+    }, 50)
 
-  const onPointerUp = useCallback(
-    (e: React.PointerEvent) => {
-      if (!draggingRef.current) return
-      draggingRef.current = false
-      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+    const finalX = Math.max(12, Math.min(window.innerWidth - 88, coords.x + info.offset.x))
+    const finalY = Math.max(12, Math.min(window.innerHeight - 110, coords.y + info.offset.y))
+    const newPos = { x: finalX, y: finalY }
+    setCoords(newPos)
+    setPosition(newPos)
+  }
 
-      const dx = e.clientX - dragStart.current.px + (dragStart.current.ox - position.x)
-      const dy = e.clientY - dragStart.current.py + (dragStart.current.oy - position.y)
-      const newX = Math.max(0, Math.min(window.innerWidth - 80, position.x + dx + (dragStart.current.ox - position.x)))
-      const newY = Math.max(0, Math.min(window.innerHeight - 120, position.y + dy + (dragStart.current.oy - position.y)))
-
-      // Snap read from current transform
-      const el = widgetRef.current
-      if (el) {
-        const m = new DOMMatrix(getComputedStyle(el).transform)
-        setPosition({ x: m.m41, y: m.m42 })
-      }
-
-      if (!movedRef.current) {
-        // It was a tap — toggle menu
-        setMenuOpen((v) => !v)
-      }
-    },
-    [position, setPosition]
-  )
+  const handleAvatarTap = () => {
+    // If the user was dragging, do not open menu
+    if (dragDistanceRef.current > 6) return
+    setMenuOpen((prev) => !prev)
+  }
 
   // Minimized pill at edge
   if (isMinimized) {
@@ -282,8 +274,7 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
       <motion.button
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        className="fixed bottom-20 right-4 z-[90] w-12 h-12 rounded-full bg-primary shadow-lg flex items-center justify-center text-white text-2xl"
-        style={{ touchAction: "none" }}
+        className="fixed bottom-20 right-4 z-[90] w-12 h-12 rounded-full bg-primary shadow-lg flex items-center justify-center text-white text-2xl hover:scale-105 active:scale-95 transition-transform"
         onClick={() => setMinimized(false)}
         aria-label="ছোটু খুলুন"
       >
@@ -293,30 +284,55 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
   }
 
   const avatarState = poseToAvatarState(pose, mood)
-  const prop = POSE_PROPS[pose]
+  const prop = POSE_PROPS[pose] || POSE_PROPS.idle
+
+  // Adaptive positioning for menu & speech bubble based on quadrant
+  const isTopHalf = coords.y < 260
+  const isLeftHalf = coords.x < 220
+
+  const popupPlacementClass = cn(
+    "absolute",
+    isTopHalf ? "top-full mt-2" : "bottom-full mb-2",
+    isLeftHalf ? "left-0" : "right-0"
+  )
 
   return (
-    <div
-      ref={widgetRef}
-      className="fixed bottom-20 right-6 z-[90] select-none"
-      style={{
-        touchAction: "none",
-        willChange: "transform",
+    <motion.div
+      drag
+      dragMomentum={false}
+      dragElastic={0.06}
+      dragConstraints={{
+        left: 12,
+        right: typeof window !== "undefined" ? window.innerWidth - 88 : 300,
+        top: 12,
+        bottom: typeof window !== "undefined" ? window.innerHeight - 110 : 500,
       }}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
+      onDragStart={handleDragStart}
+      onDrag={handleDrag}
+      onDragEnd={handleDragEnd}
+      style={{
+        x: coords.x,
+        y: coords.y,
+        position: "fixed",
+        top: 0,
+        left: 0,
+        zIndex: 90,
+        touchAction: "none",
+      }}
+      className="select-none"
     >
       {/* Quick Action Menu */}
       <AnimatePresence>
         {menuOpen && (
           <motion.div
-            initial={{ scale: 0.85, opacity: 0, y: 10 }}
+            initial={{ scale: 0.85, opacity: 0, y: isTopHalf ? -10 : 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.85, opacity: 0, y: 10 }}
+            exit={{ scale: 0.85, opacity: 0, y: isTopHalf ? -10 : 10 }}
             transition={{ duration: prefersReducedMotion ? 0.05 : 0.18, ease: "easeOut" }}
-            className="absolute bottom-full mb-2 right-0 w-48 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-primary/20 overflow-hidden"
-            // Prevent drag on the menu itself
+            className={cn(
+              popupPlacementClass,
+              "w-52 bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl border border-primary/20 overflow-hidden"
+            )}
             onPointerDown={(e) => e.stopPropagation()}
           >
             {/* Chotu mini header */}
@@ -324,7 +340,7 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
               <span className="text-xs font-black text-primary">ছোটু বলছে:</span>
               <button
                 onClick={(e) => { e.stopPropagation(); setMenuOpen(false) }}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground p-1 rounded-md"
                 aria-label="বন্ধ"
               >
                 <X className="w-3.5 h-3.5" />
@@ -333,7 +349,7 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
 
             {/* Speech copy */}
             {bubble && (
-              <div className="px-3 pt-2 pb-1 text-[11px] text-zinc-700 dark:text-zinc-300 font-medium leading-snug">
+              <div className="px-3 pt-2.5 pb-1.5 text-[11px] text-zinc-700 dark:text-zinc-300 font-medium leading-snug">
                 {bubble}
               </div>
             )}
@@ -348,10 +364,9 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
                     e.stopPropagation()
                     setMenuOpen(false)
                     if (qa.href) setLocation(qa.href)
-                    // Emit custom event for page-level handlers (add product, scan, etc.)
                     if (qa.action) window.dispatchEvent(new CustomEvent(`chotu:action:${qa.action}`))
                   }}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-primary/5 hover:text-primary transition-colors"
+                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-foreground hover:bg-primary/10 hover:text-primary transition-colors text-left"
                 >
                   <qa.icon className="w-4 h-4 text-primary shrink-0" />
                   <span>{language === "bn" ? qa.labelBn : qa.labelEn}</span>
@@ -371,13 +386,12 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
                   onMicClick()
                 } else {
                   window.dispatchEvent(new CustomEvent("chotu:open_panel"))
-                  // Small delay lets the panel render & register its listener before we fire toggle_voice
                   setTimeout(() => {
                     window.dispatchEvent(new CustomEvent("chotu:toggle_voice"))
                   }, 80)
                 }
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold text-primary hover:bg-primary/5 transition-colors"
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-bold text-primary hover:bg-primary/10 transition-colors"
             >
               <Mic className="w-4 h-4 shrink-0" />
               <span>বলুন, ছোটু আছি!</span>
@@ -385,7 +399,7 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
             </button>
 
             {/* Minimize + Offline pill */}
-            <div className="px-3 pb-2.5 pt-1 flex items-center justify-between">
+            <div className="px-3 pb-2.5 pt-1 flex items-center justify-between border-t border-border/40">
               {pendingCount > 0 && (
                 <span className="text-[10px] text-amber-600 font-bold">
                   📵 {pendingCount} অপেক্ষমাণ
@@ -403,42 +417,49 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
         )}
       </AnimatePresence>
 
-      {/* Speech Bubble — floats above avatar, never covers nav */}
+      {/* Speech Bubble — floats adaptively above or below avatar */}
       <AnimatePresence>
         {bubble && !menuOpen && (
           <motion.div
             key={bubble}
-            initial={{ scale: 0.8, opacity: 0, y: 6 }}
+            initial={{ scale: 0.8, opacity: 0, y: isTopHalf ? -6 : 6 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.8, opacity: 0, y: 6 }}
+            exit={{ scale: 0.8, opacity: 0, y: isTopHalf ? -6 : 6 }}
             transition={{ duration: prefersReducedMotion ? 0.05 : 0.2 }}
-            className="absolute bottom-full mb-1.5 right-0 max-w-[200px] bg-white dark:bg-zinc-900 rounded-2xl rounded-br-none px-3 py-2 shadow-xl border border-primary/20"
+            className={cn(
+              popupPlacementClass,
+              "max-w-[210px] bg-white dark:bg-zinc-900 rounded-2xl px-3 py-2 shadow-xl border border-primary/20",
+              isTopHalf
+                ? (isLeftHalf ? "rounded-tl-none" : "rounded-tr-none")
+                : (isLeftHalf ? "rounded-bl-none" : "rounded-br-none")
+            )}
             style={{ pointerEvents: "none" }}
           >
             <p className="text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 leading-snug">
               {bubble}
             </p>
-            {/* Tail */}
-            <div className="absolute -bottom-2 right-4 w-0 h-0 border-l-[8px] border-l-transparent border-r-[0] border-t-[8px] border-t-white dark:border-t-zinc-900" />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Main Chotu Avatar */}
-      <div className="relative">
+      {/* Main Chotu Avatar Container */}
+      <div
+        className="relative cursor-grab active:cursor-grabbing"
+        onClick={handleAvatarTap}
+      >
         {/* Pose prop badge */}
         <motion.div
           key={pose}
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: prefersReducedMotion ? 0.05 : 0.25, type: "spring", bounce: 0.4 }}
-          className="absolute -top-2 -right-2 z-10 w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-base border border-primary/20"
+          className="absolute -top-2 -right-2 z-10 w-7 h-7 rounded-full bg-white dark:bg-zinc-800 shadow-md flex items-center justify-center text-base border border-primary/20"
           title={prop.label}
         >
           {prop.emoji}
         </motion.div>
 
-        {/* Idle float animation via CSS class — only translateY, 60fps */}
+        {/* Gentle floating animation */}
         <motion.div
           animate={prefersReducedMotion ? {} : {
             y: avatarState === "idle" ? [0, -6, 0] : 0,
@@ -448,15 +469,12 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
           <ChotuAvatar
             state={avatarState}
             pose={pose}
-            className="w-16 h-20 cursor-grab active:cursor-grabbing"
+            className="w-16 h-20"
             showAura
             interactive={false}
           />
         </motion.div>
-
-        {/* Tap hint pulse ring (shown briefly on first load) */}
-        <div className="absolute inset-0 rounded-full animate-ping bg-primary/10 pointer-events-none opacity-0 [animation-iteration-count:2]" />
       </div>
-    </div>
+    </motion.div>
   )
 }
