@@ -21,8 +21,7 @@ services:
       corepack prepare pnpm@11.17.0 --activate &&
       pnpm install --frozen-lockfile &&
       pnpm --filter @workspace/api-server... run build &&
-      pnpm --filter @workspace/dokandar-mama run build &&
-      pnpm --filter @workspace/db run push-force
+      pnpm --filter @workspace/dokandar-mama run build
     startCommand: node artifacts/api-server/dist/index.mjs
     healthCheckPath: /health
     envVars:
