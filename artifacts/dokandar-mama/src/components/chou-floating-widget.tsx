@@ -307,19 +307,19 @@ export function ChouFloatingWidget({ onMicClick, language = "bn" }: ChouFloating
         top: 12,
         bottom: typeof window !== "undefined" ? window.innerHeight - 110 : 500,
       }}
+      animate={{ x: coords.x, y: coords.y }}
+      transition={{ duration: 0 }}
       onDragStart={handleDragStart}
       onDrag={handleDrag}
       onDragEnd={handleDragEnd}
       style={{
-        x: coords.x,
-        y: coords.y,
         position: "fixed",
         top: 0,
         left: 0,
         zIndex: 90,
         touchAction: "none",
       }}
-      className="select-none"
+      className="select-none cursor-grab active:cursor-grabbing"
     >
       {/* Quick Action Menu */}
       <AnimatePresence>

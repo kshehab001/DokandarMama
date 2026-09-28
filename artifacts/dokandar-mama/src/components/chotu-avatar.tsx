@@ -24,7 +24,7 @@ const SPRITE_MAP: Record<string, string> = {
   thinking: "/assets/chotu/webp/thinking.webp",
   speaking: "/assets/chotu/webp/speaking.webp",
   success: "/assets/chotu/webp/success.webp",
-  billing: "/assets/chotu/webp/billing.webp",
+  billing: "/assets/chotu/webp/idle.webp",
   sale_done: "/assets/chotu/webp/success.webp",
   growth: "/assets/chotu/webp/success.webp",
   low_stock: "/assets/chotu/webp/thinking.webp",
