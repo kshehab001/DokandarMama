@@ -72,7 +72,12 @@ export function ShopOnboardingGate({ children }: { children: React.ReactNode }) 
     )
   }
 
-  const needsOnboarding = !justJoined && !metadata?.shopName && (!currentShop || !currentShop.shop)
+  // Backend is the source of truth. Only skip loading screen once we have a definitive answer.
+  // If the backend returns no shop (404/409/null), always show onboarding — even if Clerk
+  // metadata has a stale shopName from an old/expired database.
+  const backendChecked = !isShopLoading
+  const hasBackendShop = backendChecked && currentShop?.shop != null
+  const needsOnboarding = !justJoined && backendChecked && !hasBackendShop
 
   if (!needsOnboarding) return <>{children}</>
 
