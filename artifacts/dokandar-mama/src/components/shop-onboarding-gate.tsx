@@ -61,7 +61,7 @@ export function ShopOnboardingGate({ children }: { children: React.ReactNode }) 
 
   const metadata = user.unsafeMetadata as { displayName?: string; shopName?: string; shopCategory?: string } | undefined
 
-  if (isShopLoading && !metadata?.shopName) {
+  if (isShopLoading && !justJoined) {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4 text-center">
         <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center mb-3 animate-pulse text-primary font-bold">
@@ -72,12 +72,9 @@ export function ShopOnboardingGate({ children }: { children: React.ReactNode }) 
     )
   }
 
-  // Backend is the source of truth. Only skip loading screen once we have a definitive answer.
-  // If the backend returns no shop (404/409/null), always show onboarding — even if Clerk
-  // metadata has a stale shopName from an old/expired database.
-  const backendChecked = !isShopLoading
-  const hasBackendShop = backendChecked && currentShop?.shop != null
-  const needsOnboarding = !justJoined && backendChecked && !hasBackendShop
+  // Backend is the source of truth.
+  const hasBackendShop = currentShop?.shop != null
+  const needsOnboarding = !justJoined && !hasBackendShop
 
   if (!needsOnboarding) return <>{children}</>
 
@@ -89,19 +86,17 @@ export function ShopOnboardingGate({ children }: { children: React.ReactNode }) 
     try {
       const ownerDisplayName = displayName.trim() || user.firstName || "মামা"
       // Create shop in backend DB
-      try {
-        await createShopMutation.mutateAsync({
-          data: {
-            name: shopName.trim(),
-            category: selectedCategory as any,
-            ownerName: ownerDisplayName,
-          },
-        })
-        queryClient.invalidateQueries({ queryKey: getGetCurrentShopQueryKey() })
-        queryClient.invalidateQueries({ queryKey: getListShopsQueryKey() })
-      } catch (err) {
-        console.warn("Backend shop creation notice (fallback to metadata)", err)
-      }
+      await createShopMutation.mutateAsync({
+        data: {
+          name: shopName.trim(),
+          category: selectedCategory as any,
+          ownerName: ownerDisplayName,
+        },
+      })
+
+      setJustJoined(true)
+      await queryClient.invalidateQueries({ queryKey: getGetCurrentShopQueryKey() })
+      await queryClient.invalidateQueries({ queryKey: getListShopsQueryKey() })
 
       // Save metadata to Clerk
       await user.update({
@@ -114,7 +109,8 @@ export function ShopOnboardingGate({ children }: { children: React.ReactNode }) 
       })
 
       toast({ title: "স্বাগতম! আপনার দোকান প্রস্তুত হয়েছে।" })
-    } catch {
+    } catch (err) {
+      console.error("Backend shop creation error:", err)
       toast({ title: "সেভ করতে সমস্যা হয়েছে, আবার চেষ্টা করুন", variant: "destructive" })
     } finally {
       setSaving(false)
