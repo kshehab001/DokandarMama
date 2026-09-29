@@ -48,10 +48,16 @@ export function Inventory() {
     }
   }, [canManageProducts])
   
-  const [formData, setFormData] = useState<ProductInput & { mfgDate?: string; expiryDate?: string }>({
+  const [formData, setFormData] = useState<ProductInput & { 
+    mfgDate?: string; 
+    expiryDate?: string;
+    brand?: string;
+    batchNumber?: string;
+  }>({
     name: "",
     barcode: "",
-    category: "",
+    brand: "",
+    category: "সাধারণ",
     unit: "পিস",
     price: 0,
     costPrice: 0,
@@ -59,14 +65,15 @@ export function Inventory() {
     lowStockThreshold: 5,
     isPriceVariable: false,
     mfgDate: "",
-    expiryDate: ""
+    expiryDate: "",
+    batchNumber: "",
   })
 
   const createProduct = useCreateProduct()
   const updateProduct = useUpdateProduct()
   const deleteProduct = useDeleteProduct()
 
-  const handleOpenForm = (product?: any) => {
+  const handleOpenForm = (product?: any, prefillBarcode?: string) => {
     if (!canManageProducts) {
       toast({
         title: "অনুমতি নেই",
@@ -81,21 +88,25 @@ export function Inventory() {
       setFormData({
         name: product.name,
         barcode: product.barcode || "",
+        brand: product.brand || "",
         category: product.category,
         unit: product.unit,
         price: product.price,
         costPrice: product.costPrice || 0,
         stock: product.stock,
         lowStockThreshold: product.lowStockThreshold,
-        isPriceVariable: product.isPriceVariable,
+        isPriceVariable: product.isPriceVariable ?? false,
         mfgDate: product.mfgDate ? product.mfgDate.split("T")[0] : "",
-        expiryDate: product.expiryDate ? product.expiryDate.split("T")[0] : ""
+        expiryDate: product.expiryDate ? product.expiryDate.split("T")[0] : "",
+        batchNumber: product.batchNumber || "",
       })
     } else {
       setEditingId(null)
+      const initialBarcode = prefillBarcode || ""
       setFormData({
         name: "",
-        barcode: "",
+        barcode: initialBarcode,
+        brand: "",
         category: "সাধারণ",
         unit: "পিস",
         price: 0,
@@ -104,32 +115,44 @@ export function Inventory() {
         lowStockThreshold: 5,
         isPriceVariable: false,
         mfgDate: "",
-        expiryDate: ""
+        expiryDate: "",
+        batchNumber: "",
       })
+      if (initialBarcode) {
+        handleBarcodeChange(initialBarcode)
+      }
     }
     setIsFormOpen(true)
   }
 
   const handleBarcodeChange = async (barcode: string) => {
     setFormData((prev) => ({ ...prev, barcode }))
-    if (barcode.trim().length >= 5 && !editingId) {
-      const master = await lookupMasterBarcode(barcode.trim())
+    const clean = barcode.trim()
+    if (clean.length >= 3 && !editingId) {
+      const master = await lookupMasterBarcode(clean)
       if (master) {
         setIsMasterRecognized(true)
         setFormData((prev) => ({
           ...prev,
           barcode: master.barcode,
-          name: prev.name ? prev.name : (master.nameBn || master.name),
-          category: prev.category && prev.category !== "সাধারণ" ? prev.category : master.category,
+          name: master.nameBn || master.name || prev.name,
+          brand: master.brand || prev.brand || "",
+          category: master.category || prev.category,
           unit: master.unit || prev.unit,
-          price: prev.price > 0 ? prev.price : master.defaultPrice,
-          costPrice: (prev.costPrice ?? 0) > 0 ? prev.costPrice : master.costPrice,
+          price: master.defaultPrice > 0 ? master.defaultPrice : prev.price,
+          costPrice: master.costPrice !== undefined && master.costPrice > 0 ? master.costPrice : prev.costPrice,
+          mfgDate: master.mfgDate || prev.mfgDate,
+          expiryDate: master.expiryDate || prev.expiryDate,
+          batchNumber: master.batchNumber || prev.batchNumber,
+          isPriceVariable: master.isPriceVariable !== undefined ? master.isPriceVariable : prev.isPriceVariable,
         }))
         toast({
-          title: "মাস্টার ক্যাটালগ থেকে পাওয়া গেছে!",
-          description: `${master.nameBn || master.name} (${master.brand})`,
+          title: "মাদার ডাটাবেজ থেকে তথ্য পূরণ হয়েছে! ✨",
+          description: `${master.nameBn || master.name} (${master.brand || master.category}) — প্রয়োজনে পরিবর্তন করে নিন।`,
         })
       }
+    } else if (clean.length < 3) {
+      setIsMasterRecognized(false)
     }
   }
 
@@ -234,11 +257,19 @@ export function Inventory() {
           <div className="flex flex-wrap gap-2 w-full sm:w-auto">
             <Button
               variant="outline"
-              onClick={() => setIsSellerBillOpen(true)}
+              onClick={() => setIsScannerOpen(true)}
               className="rounded-xl gap-2 flex-1 sm:flex-none border-primary/30 text-primary hover:bg-primary/10 font-bold"
             >
+              <Camera className="h-4 w-4" />
+              বারকোড স্ক্যান করে যোগ
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setIsSellerBillOpen(true)}
+              className="rounded-xl gap-2 flex-1 sm:flex-none"
+            >
               <FileText className="h-4 w-4" />
-              বিল/মেমো স্ক্যান (OCR)
+              বিল/মেমো OCR
             </Button>
             <Button variant="outline" onClick={() => setIsImportOpen(true)} className="rounded-xl gap-2 flex-1 sm:flex-none">
               <PackagePlus className="h-4 w-4" />
@@ -285,10 +316,16 @@ export function Inventory() {
                     <tr key={product.id} className="hover:bg-muted/30 transition-colors text-base">
                       <td className="px-6 py-4">
                         <div className="font-semibold text-foreground">{product.name}</div>
-                        <div className="text-sm text-muted-foreground flex gap-2 items-center mt-1">
+                        <div className="text-sm text-muted-foreground flex flex-wrap gap-2 items-center mt-1">
+                          {product.brand && <span className="font-medium text-foreground/80">{product.brand}</span>}
                           <span>{product.category}</span>
                           {product.barcode && <Badge variant="outline" className="text-xs">{product.barcode}</Badge>}
                           {product.isPriceVariable && <Badge variant="secondary" className="text-xs">পরিবর্তনশীল দাম</Badge>}
+                          {product.expiryDate && (
+                            <span className="text-xs text-muted-foreground">
+                              মেয়াদ: {new Date(product.expiryDate).toLocaleDateString("bn-BD")}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 font-medium">
@@ -330,32 +367,17 @@ export function Inventory() {
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingId ? "পণ্য এডিট করুন" : "নতুন পণ্য"}</DialogTitle>
+            <DialogTitle>{editingId ? "পণ্য এডিট করুন" : "নতুন পণ্য যোগ"}</DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>পণ্যের নাম *</Label>
-              <Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="h-12" />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>ক্যাটাগরি</Label>
-                <Input value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="h-12" />
-              </div>
-              <div className="space-y-2">
-                <Label>একক (Unit)</Label>
-                <Input value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} className="h-12" />
-              </div>
-            </div>
-
-            <div className="space-y-2">
+          <form onSubmit={handleSubmit} className="space-y-4 py-2">
+            {/* Barcode section with recognition status */}
+            <div className="space-y-1.5 p-3 rounded-2xl bg-muted/40 border border-border/70">
               <div className="flex items-center justify-between">
-                <Label>বারকোড (ঐচ্ছিক)</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">বারকোড (Barcode)</Label>
                 {isMasterRecognized && (
-                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30 text-[10px] gap-1">
-                    <Sparkles className="h-2.5 w-2.5" />
-                    মাস্টার ক্যাটালগ রিকগনিশন
+                  <Badge variant="outline" className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-[11px] font-semibold gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    মাদার ডাটাবেজ অটো-ফিল ✨
                   </Badge>
                 )}
               </div>
@@ -363,70 +385,173 @@ export function Inventory() {
                 <Input
                   value={formData.barcode}
                   onChange={(e) => handleBarcodeChange(e.target.value)}
-                  placeholder="বারকোড স্ক্যান বা টাইপ করুন"
-                  className="h-12 font-mono"
+                  placeholder="বারকোড স্ক্যান বা লিখুন"
+                  className="h-11 font-mono text-sm bg-background"
                 />
-                <Button type="button" size="icon" variant="outline" className="h-12 w-12 rounded-xl shrink-0" onClick={() => setIsScannerOpen(true)}>
+                <Button 
+                  type="button" 
+                  size="icon" 
+                  variant="outline" 
+                  className="h-11 w-11 rounded-xl shrink-0 border-primary/40 text-primary hover:bg-primary/10" 
+                  onClick={() => setIsScannerOpen(true)}
+                  title="ক্যামেরা দিয়ে স্ক্যান করুন"
+                >
                   <Camera className="h-5 w-5" />
                 </Button>
               </div>
+              {isMasterRecognized && (
+                <p className="text-[11px] text-muted-foreground">
+                  সব তথ্য মাদার ডাটাবেজ থেকে স্বয়ংক্রিয়ভাবে পূরণ হয়েছে। আপনার দোকান অনুযায়ী যেকোনো মান পরিবর্তন করতে পারবেন।
+                </p>
+              )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+            {/* Product Name */}
+            <div className="space-y-1.5">
+              <Label>পণ্যের নাম *</Label>
+              <Input 
+                required 
+                value={formData.name} 
+                onChange={e => setFormData({...formData, name: e.target.value})} 
+                placeholder="যেমন: মোজো ৫০০ মিলি"
+                className="h-11" 
+              />
+            </div>
+            
+            {/* Brand & Category */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>ব্র্যান্ড / কোম্পানি</Label>
+                <Input 
+                  value={formData.brand || ""} 
+                  onChange={e => setFormData({...formData, brand: e.target.value})} 
+                  placeholder="যেমন: আকিজ / প্রাণ"
+                  className="h-11" 
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>ক্যাটাগরি</Label>
+                <Input 
+                  value={formData.category} 
+                  onChange={e => setFormData({...formData, category: e.target.value})} 
+                  placeholder="যেমন: পানীয়"
+                  className="h-11" 
+                />
+              </div>
+            </div>
+
+            {/* Unit & Batch Number */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>একক (Unit)</Label>
+                <Input 
+                  value={formData.unit} 
+                  onChange={e => setFormData({...formData, unit: e.target.value})} 
+                  placeholder="পিস / বোতল / কেজি"
+                  className="h-11" 
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>ব্যাচ নং (ঐচ্ছিক)</Label>
+                <Input 
+                  value={formData.batchNumber || ""} 
+                  onChange={e => setFormData({...formData, batchNumber: e.target.value})} 
+                  placeholder="ব্যাচ বা লট নং"
+                  className="h-11 font-mono" 
+                />
+              </div>
+            </div>
+
+            {/* Cost & Sell Price */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
                 <Label>কেনা দাম (৳)</Label>
-                <Input type="number" value={formData.costPrice || ""} onChange={e => setFormData({...formData, costPrice: Number(e.target.value)})} className="h-12" />
+                <Input 
+                  type="number" 
+                  value={formData.costPrice || ""} 
+                  onChange={e => setFormData({...formData, costPrice: Number(e.target.value)})} 
+                  placeholder="0"
+                  className="h-11" 
+                />
               </div>
-              <div className="space-y-2">
-                <Label>বিক্রি মূল্য (৳) *</Label>
-                <Input type="number" required value={formData.price || ""} onChange={e => setFormData({...formData, price: Number(e.target.value)})} className="h-12" />
+              <div className="space-y-1.5">
+                <Label>বিক্রি মূল্য / MRP (৳) *</Label>
+                <Input 
+                  type="number" 
+                  required 
+                  value={formData.price || ""} 
+                  onChange={e => setFormData({...formData, price: Number(e.target.value)})} 
+                  placeholder="0"
+                  className="h-11 font-bold text-primary" 
+                />
               </div>
             </div>
 
+            {/* Variable price checkbox */}
             <label className="flex items-center gap-3 p-3 border rounded-xl hover:bg-muted/50 cursor-pointer">
-              <input type="checkbox" className="w-5 h-5 rounded accent-primary" checked={formData.isPriceVariable} onChange={e => setFormData({...formData, isPriceVariable: e.target.checked})} />
+              <input 
+                type="checkbox" 
+                className="w-4 h-4 rounded accent-primary" 
+                checked={formData.isPriceVariable} 
+                onChange={e => setFormData({...formData, isPriceVariable: e.target.checked})} 
+              />
               <div>
-                <div className="font-medium">বিক্রির সময় দাম পরিবর্তন করা যাবে</div>
-                <div className="text-xs text-muted-foreground">মাছ/সবজি বা দরদামের পণ্যের জন্য</div>
+                <div className="text-sm font-medium">বিক্রির সময় দাম পরিবর্তন করা যাবে</div>
+                <div className="text-xs text-muted-foreground">দরদামের পণ্য বা কাঁচাবাজারের জন্য</div>
               </div>
             </label>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+            {/* MFG & Expiry Date */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
                 <Label>উৎপাদন তারিখ (MFG)</Label>
                 <Input
                   type="date"
                   value={formData.mfgDate || ""}
                   onChange={(e) => setFormData({ ...formData, mfgDate: e.target.value })}
-                  className="h-12"
+                  className="h-11"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label>মেয়াদোত্তীর্ণ তারিখ (EXP)</Label>
                 <Input
                   type="date"
                   value={formData.expiryDate || ""}
                   onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                  className="h-12"
+                  className="h-11"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+            {/* Stock & Low Stock Alert */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
                 <Label>বর্তমান স্টক</Label>
-                <Input type="number" value={formData.stock === 0 ? "" : formData.stock} onChange={e => setFormData({...formData, stock: Number(e.target.value)})} className="h-12" />
+                <Input 
+                  type="number" 
+                  value={formData.stock === 0 ? "" : formData.stock} 
+                  onChange={e => setFormData({...formData, stock: Number(e.target.value)})} 
+                  placeholder="0"
+                  className="h-11" 
+                />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label>লো-স্টক এলার্ট</Label>
-                <Input type="number" value={formData.lowStockThreshold} onChange={e => setFormData({...formData, lowStockThreshold: Number(e.target.value)})} className="h-12" />
+                <Input 
+                  type="number" 
+                  value={formData.lowStockThreshold} 
+                  onChange={e => setFormData({...formData, lowStockThreshold: Number(e.target.value)})} 
+                  className="h-11" 
+                />
               </div>
             </div>
 
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} className="h-12 w-full sm:w-auto">বাতিল</Button>
-              <Button type="submit" disabled={createProduct.isPending || updateProduct.isPending} className="h-12 w-full sm:w-auto">
-                সেভ করুন
+            <DialogFooter className="pt-4 gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)} className="h-11 w-full sm:w-auto">
+                বাতিল
+              </Button>
+              <Button type="submit" disabled={createProduct.isPending || updateProduct.isPending} className="h-11 w-full sm:w-auto font-bold">
+                {editingId ? "আপডেট করুন" : "সংরক্ষণ করুন"}
               </Button>
             </DialogFooter>
           </form>
@@ -464,8 +589,12 @@ export function Inventory() {
         open={isScannerOpen}
         onOpenChange={setIsScannerOpen}
         onScan={(code) => {
-          handleBarcodeChange(code)
           setIsScannerOpen(false)
+          if (!isFormOpen) {
+            handleOpenForm(undefined, code)
+          } else {
+            handleBarcodeChange(code)
+          }
         }}
       />
 

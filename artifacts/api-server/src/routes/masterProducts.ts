@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or } from "drizzle-orm";
+import { desc, eq, ilike, or } from "drizzle-orm";
 import { z } from "zod/v4";
-import { db, masterProductsTable } from "@workspace/db";
+import { db, masterProductsTable, productsTable } from "@workspace/db";
 import { toNum } from "../lib/numeric";
 import { requireShop } from "../lib/tenant";
 
@@ -22,8 +22,9 @@ function serialize(row: typeof masterProductsTable.$inferSelect) {
 }
 
 /**
- * Barcode lookup in the global catalogue. Read-only and shop-scoped only in the
- * sense that the caller must belong to a shop — the catalogue itself is shared.
+ * Barcode lookup in the global mother catalogue.
+ * Checks master_products and community shop entries so any product added with
+ * a barcode anywhere in Bangladesh becomes instantly recognized for all users.
  */
 router.get("/master-products/lookup", async (req, res): Promise<void> => {
   requireShop(req);
@@ -33,16 +34,83 @@ router.get("/master-products/lookup", async (req, res): Promise<void> => {
     return;
   }
 
-  const [row] = await db
+  const cleanCode = barcode.data;
+
+  // 1. Look in master_products table
+  const [masterRow] = await db
     .select()
     .from(masterProductsTable)
-    .where(eq(masterProductsTable.barcode, barcode.data));
+    .where(eq(masterProductsTable.barcode, cleanCode));
 
-  if (!row) {
+  // 2. Query productsTable for the latest shop product with this barcode
+  const [shopProduct] = await db
+    .select()
+    .from(productsTable)
+    .where(eq(productsTable.barcode, cleanCode))
+    .orderBy(desc(productsTable.updatedAt))
+    .limit(1);
+
+  if (!masterRow && !shopProduct) {
     res.status(404).json({ error: "এই বারকোড মাস্টার তালিকায় নেই" });
     return;
   }
-  res.json(serialize(row));
+
+  // If found in shop product but missing from master catalogue, sync it now
+  if (!masterRow && shopProduct) {
+    try {
+      await db
+        .insert(masterProductsTable)
+        .values({
+          barcode: cleanCode,
+          name: shopProduct.name,
+          nameBn: shopProduct.name,
+          brand: shopProduct.brand,
+          category: shopProduct.category,
+          unit: shopProduct.unit,
+          defaultPrice: shopProduct.price,
+        })
+        .onConflictDoNothing();
+    } catch {
+      // ignore
+    }
+  }
+
+  const name = masterRow?.name || shopProduct?.name || "";
+  const nameBn = masterRow?.nameBn || shopProduct?.name || name;
+  const brand = masterRow?.brand || shopProduct?.brand || "";
+  const category = masterRow?.category || shopProduct?.category || "সাধারণ";
+  const unit = masterRow?.unit || shopProduct?.unit || "পিস";
+  const defaultPrice = masterRow?.defaultPrice
+    ? toNum(masterRow.defaultPrice)
+    : shopProduct?.price
+    ? toNum(shopProduct.price)
+    : 0;
+  const costPrice = shopProduct?.costPrice
+    ? toNum(shopProduct.costPrice)
+    : defaultPrice > 0
+    ? Math.round(defaultPrice * 0.85)
+    : 0;
+  const mfgDate = shopProduct?.mfgDate ? shopProduct.mfgDate.toISOString() : null;
+  const expiryDate = shopProduct?.expiryDate ? shopProduct.expiryDate.toISOString() : null;
+  const batchNumber = shopProduct?.batchNumber || null;
+  const isPriceVariable = shopProduct?.isPriceVariable ?? false;
+
+  res.json({
+    id: masterRow?.id || shopProduct?.id || 0,
+    barcode: cleanCode,
+    name,
+    nameBn,
+    brand,
+    category,
+    unit,
+    defaultPrice,
+    costPrice,
+    mfgDate,
+    expiryDate,
+    batchNumber,
+    isPriceVariable,
+    imageUrl: masterRow?.imageUrl || null,
+  });
 });
 
 /** Name search, used by the invoice OCR matcher and the add-product form. */

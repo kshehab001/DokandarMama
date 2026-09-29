@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, eq, ilike, or } from "drizzle-orm";
-import { db, productsTable, type ShopRole } from "@workspace/db";
+import { db, productsTable, masterProductsTable, type ShopRole } from "@workspace/db";
 import {
   CreateProductBody,
   DeleteProductParams,
@@ -110,6 +110,37 @@ router.post("/products", async (req, res): Promise<void> => {
         brand: (parsed.data as any).brand ?? null,
       })
       .returning();
+
+    // Auto-sync into Mother Database (master_products) so any other shopkeeper scanning this barcode gets instant autofill
+    if (barcode && barcode.trim().length >= 3) {
+      const cleanBarcode = barcode.trim();
+      try {
+        await db
+          .insert(masterProductsTable)
+          .values({
+            barcode: cleanBarcode,
+            name: name.trim(),
+            nameBn: name.trim(),
+            brand: (parsed.data as any).brand ?? null,
+            category,
+            unit,
+            defaultPrice: String(price),
+          })
+          .onConflictDoUpdate({
+            target: masterProductsTable.barcode,
+            set: {
+              name: name.trim(),
+              nameBn: name.trim(),
+              brand: (parsed.data as any).brand ?? null,
+              category,
+              unit,
+              defaultPrice: String(price),
+            },
+          });
+      } catch {
+        // Silently catch to prevent blocking product creation
+      }
+    }
 
     res.status(201).json(serializeProduct(row, shopCtx.role));
   } catch (err: any) {
@@ -224,6 +255,37 @@ router.patch("/products/:id", async (req, res): Promise<void> => {
     if (!row) {
       res.status(404).json({ error: "Product not found" });
       return;
+    }
+
+    // Auto-update Mother Database (master_products) with newest details if barcode is present
+    const targetBarcode = row.barcode;
+    if (targetBarcode && targetBarcode.trim().length >= 3) {
+      try {
+        await db
+          .insert(masterProductsTable)
+          .values({
+            barcode: targetBarcode.trim(),
+            name: row.name,
+            nameBn: row.name,
+            brand: row.brand,
+            category: row.category,
+            unit: row.unit,
+            defaultPrice: row.price,
+          })
+          .onConflictDoUpdate({
+            target: masterProductsTable.barcode,
+            set: {
+              name: row.name,
+              nameBn: row.name,
+              brand: row.brand,
+              category: row.category,
+              unit: row.unit,
+              defaultPrice: row.price,
+            },
+          });
+      } catch {
+        // Silently catch
+      }
     }
 
     res.json(serializeProduct(row, shopCtx.role));

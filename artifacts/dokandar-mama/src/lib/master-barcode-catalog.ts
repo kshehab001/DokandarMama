@@ -9,11 +9,15 @@ export interface MasterCatalogProduct {
   barcode: string
   name: string
   nameBn: string
-  brand: string
+  brand?: string
   category: string
   unit: string
   defaultPrice: number
-  costPrice: number
+  costPrice?: number
+  mfgDate?: string
+  expiryDate?: string
+  batchNumber?: string
+  isPriceVariable?: boolean
 }
 
 export const BANGLADESH_MASTER_CATALOG: MasterCatalogProduct[] = [
@@ -50,17 +54,13 @@ export const BANGLADESH_MASTER_CATALOG: MasterCatalogProduct[] = [
 ]
 
 /**
- * Searches offline master barcode list or queries remote master catalog
+ * Searches live mother database (/api/master-products/lookup) or falls back to local offline catalog
  */
 export async function lookupMasterBarcode(barcode: string): Promise<MasterCatalogProduct | null> {
   const clean = barcode.trim()
   if (!clean) return null
 
-  // 1. Check local catalog
-  const found = BANGLADESH_MASTER_CATALOG.find((p) => p.barcode === clean)
-  if (found) return found
-
-  // 2. Try fetching from backend /api/master-products/lookup
+  // 1. Try querying backend /api/master-products/lookup (Mother database across all shops)
   try {
     const res = await fetch(`/api/master-products/lookup?barcode=${encodeURIComponent(clean)}`)
     if (res.ok) {
@@ -73,14 +73,24 @@ export async function lookupMasterBarcode(barcode: string): Promise<MasterCatalo
           brand: data.brand || "",
           category: data.category || "সাধারণ",
           unit: data.unit || "পিস",
-          defaultPrice: data.defaultPrice || 0,
-          costPrice: Math.round((data.defaultPrice || 0) * 0.85),
+          defaultPrice: Number(data.defaultPrice) || 0,
+          costPrice: data.costPrice !== undefined && data.costPrice !== null 
+            ? Number(data.costPrice) 
+            : Math.round((Number(data.defaultPrice) || 0) * 0.85),
+          mfgDate: data.mfgDate ? data.mfgDate.split("T")[0] : undefined,
+          expiryDate: data.expiryDate ? data.expiryDate.split("T")[0] : undefined,
+          batchNumber: data.batchNumber || undefined,
+          isPriceVariable: Boolean(data.isPriceVariable),
         }
       }
     }
   } catch (err) {
     console.warn("Backend master barcode lookup offline:", err)
   }
+
+  // 2. Fallback to local offline catalog if backend didn't return or was offline
+  const found = BANGLADESH_MASTER_CATALOG.find((p) => p.barcode === clean)
+  if (found) return found
 
   return null
 }
